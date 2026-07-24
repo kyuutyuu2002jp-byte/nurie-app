@@ -26,226 +26,115 @@
     --line: #e3d9c6;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  html, body{ height:100%; }
+  html, body{ height:100%; overscroll-behavior:none; }
   body{
     margin:0;
     overflow:hidden;
     font-family:"Baloo 2", sans-serif;
-    background:
-      radial-gradient(circle at 8% 12%, #ffe9cf 0%, transparent 40%),
-      radial-gradient(circle at 92% 85%, #d9f0ec 0%, transparent 45%),
-      var(--bg);
     color:var(--ink);
     height:calc(var(--app-vh, 1vh) * 100);
-    display:flex;
-    justify-content:center;
-  }
-  .app-shell{
-    width:100%;
-    max-width:900px;
-    height:100%;
-    display:flex;
-    flex-direction:column;
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
+    position:relative;
   }
 
-  /* ---------- 上バー ---------- */
-  .top-bar{
-    flex:0 0 auto;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:6px 8px;
-    gap:8px;
-  }
-  .top-bar .title{
-    font-weight:800;
-    font-size:15px;
-    color:var(--accent1);
-    white-space:nowrap;
-  }
-  .icon-btn{
-    border:none;
-    background:var(--panel);
-    box-shadow:0 4px 0 var(--line);
-    border-radius:14px;
-    padding:6px 10px;
-    font-family:inherit;
-    font-weight:700;
-    font-size:13px;
-    display:flex;
-    align-items:center;
-    gap:6px;
-    cursor:pointer;
-    color:var(--ink);
-    white-space:nowrap;
-  }
-  .icon-btn:active{ transform:translateY(2px); box-shadow:0 2px 0 var(--line); }
-
-  /* ---------- 塗り絵エリア(画面のほとんどを占める) ---------- */
+  /* ---------- キャンバスを画面まるごとに広げる ---------- */
   .canvas-area{
-    flex:1;
-    min-height:0;
+    position:fixed;
+    inset:0;
+    background:#fff;
+    overflow:auto;
+    -webkit-overflow-scrolling:touch;
     display:flex;
     align-items:center;
     justify-content:center;
-    padding:2px;
-    position:relative;
   }
-  .board-wrap{
-    background:var(--panel);
-    border-radius:14px;
-    padding:2px;
-    box-shadow:0 4px 0 var(--line);
-    position:relative;
-  }
-  .board-scroll{
-    overflow:auto;
-    border-radius:10px;
-    -webkit-overflow-scrolling:touch;
-  }
-  .canvas-stack{ position:relative; width:100%; height:100%; }
+  .canvas-stack{ position:relative; flex:0 0 auto; }
   .canvas-stack canvas{ position:absolute; top:0; left:0; width:100%; height:100%; display:block; }
   #colorLayer{ background:#fff; touch-action:none; cursor:crosshair; z-index:1; }
   #previewLayer{ background:transparent; pointer-events:none; z-index:2; }
   #lineLayer{ background:transparent; pointer-events:none; z-index:3; }
 
+  /* ---------- 画面の下に浮かせる、どうぐバー(ラベルつき) ---------- */
+  .floating-toolbar{
+    position:fixed;
+    left:50%;
+    bottom:calc(env(safe-area-inset-bottom) + 10px);
+    transform:translateX(-50%);
+    z-index:60;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    background:rgba(255,255,255,0.96);
+    padding:8px 10px;
+    border-radius:22px;
+    box-shadow:0 6px 18px rgba(58,50,38,0.18);
+    max-width:calc(100vw - 16px);
+  }
+  .toolbar-row{
+    display:flex;
+    flex-direction:row;
+    align-items:center;
+    gap:6px;
+    overflow-x:auto;
+    overflow-y:hidden;
+    touch-action:pan-x;
+    overscroll-behavior:contain;
+  }
+  .color-row{ height:40px; }
+  .brush-size-inline{ display:flex; align-items:center; gap:4px; width:80px; flex:0 0 auto; }
+  .brush-size-inline span{ font-size:14px; }
+  .fab{
+    width:auto; min-width:54px; height:52px;
+    border-radius:14px;
+    border:none;
+    background:#f4efe2;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:2px;
+    cursor:pointer;
+    padding:5px 8px;
+    flex:0 0 auto;
+    color:var(--ink);
+  }
+  .fab-icon{ font-size:18px; line-height:1; }
+  .fab-label{ font-size:10px; font-weight:700; line-height:1; white-space:nowrap; }
+  .fab.active{ background:var(--accent2); color:#fff; }
+  .fab.save{ background:var(--accent1); color:#fff; }
+  .fab:disabled{ opacity:0.4; cursor:not-allowed; }
+  .toolbar-divider{ width:1px; height:32px; background:var(--line); flex:0 0 auto; margin:0 2px; }
+  .color-dot{
+    width:22px; height:22px;
+    border-radius:50%;
+    display:block;
+    border:2px solid #fff;
+    box-shadow:0 0 0 1.5px var(--line);
+  }
+
+  /* ---------- ズームは左上に小さく浮かせる ---------- */
   .zoom-controls{
-    position:absolute;
-    top:10px; right:10px;
-    z-index:6;
+    position:fixed;
+    top:calc(env(safe-area-inset-top) + 10px);
+    left:calc(env(safe-area-inset-left) + 10px);
+    z-index:60;
     display:flex;
     align-items:center;
     gap:2px;
     background:rgba(255,255,255,0.92);
     border-radius:999px;
     padding:3px;
-    box-shadow:0 2px 0 var(--line);
+    box-shadow:0 2px 8px rgba(58,50,38,0.15);
   }
   .zoom-btn{
-    width:26px; height:26px; border-radius:50%; border:none;
+    width:28px; height:28px; border-radius:50%; border:none;
     background:#f4efe2; color:var(--ink); font-weight:800; font-size:15px;
     cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;
   }
   .zoom-btn:disabled{ color:#c9beac; cursor:not-allowed; }
-  .zoom-label{ font-size:11px; font-weight:700; color:#8a7f6c; width:36px; text-align:center; cursor:pointer; }
+  .zoom-label{ font-size:11px; font-weight:700; color:#8a7f6c; width:38px; text-align:center; cursor:pointer; }
 
-  /* ---------- 下バー(どうぐ・いろ) ---------- */
-  .bottom-bar{
-    flex:0 0 auto;
-    background:var(--panel);
-    border-radius:22px 22px 0 0;
-    box-shadow:0 -4px 0 var(--line);
-    padding:8px 10px 10px;
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-  }
-  .tool-row{
-    display:flex;
-    align-items:center;
-    gap:6px;
-    flex-wrap:nowrap;
-    overflow-x:auto;
-  }
-  .tool-btn{
-    border:3px solid transparent;
-    background:#f4efe2;
-    border-radius:12px;
-    padding:8px 12px;
-    font-family:inherit;
-    font-weight:700;
-    font-size:14px;
-    cursor:pointer;
-    display:flex; align-items:center; gap:5px;
-    white-space:nowrap;
-    flex-shrink:0;
-  }
-  .tool-btn.active{ border-color:var(--accent2); background:#e6f5f3; }
-  .brush-size-wrap{ display:flex; align-items:center; gap:4px; flex:1; min-width:90px; max-width:140px; }
-  .brush-size-wrap span{ font-size:16px; }
-  .spacer{ flex:1; }
-  .small-btn{
-    border:none; border-radius:12px; padding:8px 10px; font-family:inherit;
-    font-weight:700; font-size:12px; cursor:pointer; color:#fff;
-    white-space:nowrap; flex-shrink:0;
-  }
-  .small-btn.undo{background:var(--accent2);}
-  .small-btn.clear{background:#c9beac;}
-  .small-btn.save{background:var(--accent1);}
-  .small-btn:disabled{background:#e4ddcd; color:#b8ae9b; cursor:not-allowed;}
-
-  .color-row{
-    display:flex;
-    align-items:center;
-    gap:6px;
-    flex-wrap:wrap;
-    justify-content:flex-start;
-    max-height:76px;
-    overflow-y:auto;
-  }
-  .swatch{ width:30px; height:30px; min-width:30px; border-radius:50%; border:3px solid #fff; box-shadow:0 0 0 2px var(--line); cursor:pointer; padding:0; }
-  .swatch.active{ box-shadow:0 0 0 3px var(--ink); transform:scale(1.08); }
-  .swatch-wrap{ position:relative; width:30px; height:30px; min-width:30px; }
-  .swatch-del{
-    position:absolute; top:-5px; right:-5px; width:15px; height:15px; border-radius:50%;
-    border:none; background:rgba(60,50,40,0.8); color:#fff; font-size:9px; line-height:15px;
-    text-align:center; padding:0; cursor:pointer;
-  }
-  .swatch-add-wrap{ position:relative; width:30px; height:30px; min-width:30px; }
-  .swatch-add-visual{
-    width:30px; height:30px; border-radius:50%;
-    border:2px dashed var(--line); background:transparent; color:var(--accent1);
-    font-weight:800; font-size:15px; cursor:pointer;
-    display:flex; align-items:center; justify-content:center;
-    pointer-events:none; /* タップは下の本物の input が受け取る */
-  }
-  .swatch-add-input{
-    position:absolute; top:0; left:0; width:30px; height:30px;
-    opacity:0; padding:0; border:0; margin:0; cursor:pointer;
-  }
-  input[type=range]{ accent-color:var(--accent1); width:100%; }
-  input[type=color]{ width:30px;height:30px;border:none;border-radius:50%;overflow:hidden;padding:0;cursor:pointer;background:none; }
-  .visually-hidden{
-    position:absolute;
-    width:1px; height:1px;
-    padding:0; margin:-1px;
-    overflow:hidden;
-    clip:rect(0,0,0,0);
-    white-space:nowrap;
-    border:0;
-    opacity:0;
-  }
-  .toast{
-    position:fixed;
-    left:50%;
-    bottom:calc(100px + env(safe-area-inset-bottom));
-    transform:translateX(-50%) translateY(16px);
-    background:rgba(58,50,38,0.92);
-    color:#fff;
-    padding:10px 22px;
-    border-radius:999px;
-    font-weight:700;
-    font-size:14px;
-    white-space:nowrap;
-    opacity:0;
-    pointer-events:none;
-    transition:opacity .25s ease, transform .25s ease;
-    z-index:300;
-  }
-  .toast.show{
-    opacity:1;
-    transform:translateX(-50%) translateY(0);
-  }
-
-  /* ---------- モーダル(そざい選択・ほぞん一覧) ---------- */
+  /* ---------- モーダル(そざい・さくひん・いろ) ---------- */
   .modal-overlay{
     position:fixed; inset:0;
     background:rgba(58,50,38,0.55);
-    z-index:50;
+    z-index:80;
     display:none;
     align-items:flex-end;
     justify-content:center;
@@ -254,11 +143,12 @@
   .modal-sheet{
     background:var(--panel);
     width:100%;
-    max-width:640px;
+    max-width:520px;
     max-height:78vh;
     overflow-y:auto;
     border-radius:24px 24px 0 0;
     padding:16px;
+    padding-bottom:calc(16px + env(safe-area-inset-bottom));
     box-shadow:0 -6px 20px rgba(0,0,0,0.15);
     transform:translateY(16px);
     opacity:0;
@@ -275,24 +165,6 @@
   }
 
   .materials-grid{ display:flex; flex-wrap:wrap; gap:12px; }
-  .materials-transfer-row{
-    display:flex;
-    gap:10px;
-    margin-top:16px;
-    padding-top:14px;
-    border-top:1px solid var(--line);
-  }
-  .import-btn-wrap{ position:relative; }
-  .import-btn-wrap input[type=file]{
-    position:absolute; top:0; left:0; width:100%; height:100%;
-    opacity:0; margin:0; padding:0; cursor:pointer;
-  }
-  .materials-transfer-hint{
-    font-size:11px;
-    color:#8a7f6c;
-    margin-top:8px;
-    line-height:1.5;
-  }
   .material-chip{
     flex:0 0 auto; width:76px; display:flex; flex-direction:column; align-items:center; gap:5px;
     border:none; background:none; cursor:pointer; padding:2px;
@@ -307,6 +179,16 @@
   .material-label{ font-size:11px; font-weight:700; color:#8a7f6c; max-width:76px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .material-chip.add-chip .material-thumb{ border:2px dashed var(--line); background:transparent; color:var(--accent1); }
 
+  .materials-transfer-row{ display:flex; gap:10px; margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+  .import-btn-wrap{ position:relative; }
+  .import-btn-wrap input[type=file]{ position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; margin:0; padding:0; cursor:pointer; }
+  .materials-transfer-hint{ font-size:11px; color:#8a7f6c; margin-top:8px; line-height:1.5; }
+  .icon-btn{
+    border:none; background:var(--panel); box-shadow:0 4px 0 var(--line); border-radius:14px;
+    padding:8px 12px; font-family:inherit; font-weight:700; font-size:13px;
+    display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--ink); white-space:nowrap;
+  }
+
   .gallery-empty{ font-size:13px; color:#c2b8a4; }
   .gallery-grid{ display:flex; flex-wrap:wrap; gap:10px; }
   .gallery-item{ position:relative; width:76px; height:76px; border-radius:12px; overflow:hidden; border:2px solid var(--line); cursor:pointer; }
@@ -317,87 +199,80 @@
     line-height:20px; text-align:center; padding:0; cursor:pointer;
   }
 
-  /* ---------- 横向き(横はば > 高さ)のときは、右に細い操作パネル、
-     残り全部をぬりえエリアにする ---------- */
-  @media (orientation:landscape){
-    .app-shell{
-      display:grid;
-      grid-template-columns: 1fr 200px;
-      grid-template-rows: auto 1fr;
-      grid-template-areas:
-        "canvas top"
-        "canvas side";
-      height:100%;
-      max-width:none;
-    }
-    .top-bar{
-      grid-area: top;
-      flex-direction:column;
-      align-items:stretch;
-      gap:6px;
-      padding:8px 8px 4px;
-    }
-    .top-bar .title{ display:none; }
-    .canvas-area{ grid-area: canvas; padding:4px; }
-    .bottom-bar{
-      grid-area: side;
-      border-radius:0;
-      box-shadow:none;
-      border-left:1px solid var(--line);
-      overflow-y:auto;
-      height:100%;
-    }
-    .tool-row{ flex-wrap:wrap; overflow-x:visible; }
-    .brush-size-wrap{ flex:1 1 100%; max-width:none; order:10; }
-    .spacer{ display:none; }
-    .color-row{ max-height:none; }
+  /* ---------- いろピッカー(モーダル内) ---------- */
+  .brush-size-row{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .brush-size-row span{ font-size:18px; }
+  input[type=range]{ accent-color:var(--accent1); flex:1; }
+  .color-row{ flex-wrap:nowrap; }
+  .swatch{ width:32px; height:32px; border-radius:50%; border:3px solid #fff; box-shadow:0 0 0 2px var(--line); cursor:pointer; padding:0; display:block; flex-shrink:0; }
+  .swatch.active{ box-shadow:0 0 0 3px var(--ink); transform:scale(1.08); }
+  .swatch-wrap{ position:relative; width:32px; height:32px; flex-shrink:0; }
+  .swatch-del{
+    position:absolute; top:-5px; right:-5px; width:15px; height:15px; border-radius:50%;
+    border:none; background:rgba(60,50,40,0.8); color:#fff; font-size:9px; line-height:15px;
+    text-align:center; padding:0; cursor:pointer;
   }
+  .swatch-add-wrap{ position:relative; width:32px; height:32px; flex-shrink:0; }
+  .swatch-add-visual{
+    width:32px; height:32px; border-radius:50%;
+    border:2px dashed var(--line); background:transparent; color:var(--accent1);
+    font-weight:800; font-size:16px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    pointer-events:none;
+  }
+  .swatch-add-input{ position:absolute; top:0; left:0; width:32px; height:32px; opacity:0; padding:0; border:0; margin:0; cursor:pointer; }
+
+  .toast{
+    position:fixed;
+    left:50%;
+    bottom:calc(30px + env(safe-area-inset-bottom));
+    transform:translateX(-50%) translateY(16px);
+    background:rgba(58,50,38,0.92);
+    color:#fff;
+    padding:10px 22px;
+    border-radius:999px;
+    font-weight:700;
+    font-size:14px;
+    white-space:nowrap;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease;
+    z-index:300;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
 </style>
 </head>
 <body>
 
-  <div class="app-shell">
-    <div class="top-bar">
-      <button class="icon-btn" id="open-materials">🐶 そざい</button>
-      <span class="title">ぬりえあそび</span>
-      <button class="icon-btn" id="open-gallery">📁 さくひん</button>
-    </div>
-
-    <div class="canvas-area" id="canvas-area">
-      <div class="board-wrap">
-        <div class="board-scroll" id="board-scroll">
-          <div class="canvas-stack" id="canvas-stack">
-            <canvas id="colorLayer" width="560" height="560"></canvas>
-            <canvas id="previewLayer" width="560" height="560"></canvas>
-            <canvas id="lineLayer" width="560" height="560"></canvas>
-          </div>
-        </div>
-        <div class="zoom-controls">
-          <button class="zoom-btn" id="zoom-out">－</button>
-          <span class="zoom-label" id="zoom-label" title="タップで100%に戻す">100%</span>
-          <button class="zoom-btn" id="zoom-in">＋</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="bottom-bar">
-      <div class="tool-row">
-        <button class="tool-btn active" id="tool-pen" title="ペン">✏️ ペン</button>
-        <button class="tool-btn" id="tool-fill" title="ぬりつぶし">🪣 ぬり</button>
-        <div class="brush-size-wrap">
-          <span>●</span>
-          <input type="range" id="brush-size" min="2" max="30" value="10">
-        </div>
-        <div class="spacer"></div>
-        <button class="small-btn undo" id="btn-undo" title="ひとつ もどす">↩️ もどす</button>
-        <button class="small-btn clear" id="btn-clear" title="さいしょから やりなおす">🔄 はじめから</button>
-        <button class="small-btn save" id="btn-save" title="がぞうとして ほぞんする">💾 ほぞん</button>
-      </div>
-      <div class="color-row" id="palette-swatches"></div>
+  <div class="canvas-area" id="canvas-area">
+    <div class="canvas-stack" id="canvas-stack">
+      <canvas id="colorLayer" width="560" height="560"></canvas>
+      <canvas id="previewLayer" width="560" height="560"></canvas>
+      <canvas id="lineLayer" width="560" height="560"></canvas>
     </div>
   </div>
 
-  <div class="toast" id="toast"></div>
+  <div class="zoom-controls">
+    <button class="zoom-btn" id="zoom-out">－</button>
+    <span class="zoom-label" id="zoom-label" title="タップで100%に戻す">100%</span>
+    <button class="zoom-btn" id="zoom-in">＋</button>
+  </div>
+
+  <div class="floating-toolbar">
+    <div class="toolbar-row">
+      <button class="fab" id="open-materials" title="そざい"><span class="fab-icon">🐶</span><span class="fab-label">そざい</span></button>
+      <button class="fab" id="open-gallery" title="さくひん"><span class="fab-icon">📁</span><span class="fab-label">さくひん</span></button>
+      <div class="toolbar-divider"></div>
+      <button class="fab active" id="tool-pen" title="ペン"><span class="fab-icon">✏️</span><span class="fab-label">ペン</span></button>
+      <button class="fab" id="tool-fill" title="ぬりつぶし"><span class="fab-icon">🪣</span><span class="fab-label">ぬり</span></button>
+      <div class="brush-size-inline"><span>●</span><input type="range" id="brush-size" min="2" max="30" value="10"></div>
+      <div class="toolbar-divider"></div>
+      <button class="fab" id="btn-undo" title="もどす"><span class="fab-icon">↩️</span><span class="fab-label">もどす</span></button>
+      <button class="fab" id="btn-clear" title="はじめから"><span class="fab-icon">🔄</span><span class="fab-label">はじめから</span></button>
+      <button class="fab save" id="btn-save" title="ほぞんする"><span class="fab-icon">💾</span><span class="fab-label">ほぞん</span></button>
+    </div>
+    <div class="toolbar-row color-row" id="palette-swatches"></div>
+  </div>
 
   <!-- そざいをえらぶモーダル -->
   <div class="modal-overlay" id="materials-overlay">
@@ -423,6 +298,8 @@
       <div class="gallery-grid" id="gallery-grid"></div>
     </div>
   </div>
+
+  <div class="toast" id="toast"></div>
 
 <script>
 /* ---------- キャンバスを3まい用意する ---------- */
@@ -532,11 +409,6 @@ function drawTriangle(ctx,x1,y1,x2,y2,x3,y3){
   ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3); ctx.closePath();
   ctx.stroke();
 }
-function drawTriangle(ctx,x1,y1,x2,y2,x3,y3){
-  ctx.beginPath();
-  ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3); ctx.closePath();
-  ctx.stroke();
-}
 
 function roundedRect(ctx,x,y,w,h,r){
   ctx.moveTo(x+r,y);
@@ -600,7 +472,10 @@ const DEFAULT_COLORS = ['#ef4444','#ff9f1c','#ffd23f','#7fd858','#4fb3a9','#7ec8
 let customColors = [];
 const paletteSwatchesEl = document.getElementById('palette-swatches');
 
-function selectColor(hex){ currentColor = hex; renderPalette(); }
+function selectColor(hex){
+  currentColor = hex;
+  renderPalette();
+}
 function addCustomColor(hex){
   hex = hex.toLowerCase();
   if(!DEFAULT_COLORS.includes(hex) && !customColors.includes(hex)) customColors.push(hex);
@@ -608,7 +483,7 @@ function addCustomColor(hex){
 }
 function deleteCustomColor(hex){
   customColors = customColors.filter(c => c !== hex);
-  if(currentColor === hex) currentColor = DEFAULT_COLORS[0];
+  if(currentColor === hex) selectColor(DEFAULT_COLORS[0]);
   renderPalette();
 }
 function renderPalette(){
@@ -636,9 +511,6 @@ function renderPalette(){
     paletteSwatchesEl.appendChild(wrap);
   });
 
-  /* 「＋」は見た目だけの飾りで、その真上に本物の <input type="color"> を
-     透明にして重ねてある。指は必ず本物の入力欄に直接触れるので、
-     ボタン経由でクリックを飛ばす方式より確実にスマホで開く。 */
   const addWrap = document.createElement('div');
   addWrap.className = 'swatch-add-wrap';
   const addVisual = document.createElement('div');
@@ -654,31 +526,22 @@ function renderPalette(){
   addWrap.appendChild(addInput);
   paletteSwatchesEl.appendChild(addWrap);
 }
-renderPalette();
+selectColor(currentColor);
 
-/* ---------- スマホの本当の画面の高さを計算する ----------
-   ブラウザのアドレスバーが出たり消えたりすると 100vh の値がずれて、
-   下のバー(保存ボタンなど)が画面の外にはみ出してしまうことがあるため、
-   実際の window.innerHeight を元に高さを毎回計算しなおす。
------------------------------------------------------------------- */
+/* ---------- 画面にあわせて「正方形」のキャンバスサイズを計算する ---------- */
 function setAppVH(){
   document.documentElement.style.setProperty('--app-vh', (window.innerHeight * 0.01) + 'px');
 }
 setAppVH();
-window.addEventListener('resize', setAppVH);
-window.addEventListener('orientationchange', ()=> setTimeout(setAppVH, 250));
 
-/* ---------- 画面サイズにあわせてキャンバスを最大化 ---------- */
 const canvasAreaEl = document.getElementById('canvas-area');
-const boardScrollEl = document.getElementById('board-scroll');
 const canvasStackEl = document.getElementById('canvas-stack');
+let baseSquareSize = 300;
 
 function fitCanvasArea(){
   const rect = canvasAreaEl.getBoundingClientRect();
-  const w = Math.max(160, Math.floor(rect.width) - 10);
-  const h = Math.max(160, Math.floor(rect.height) - 10);
-  boardScrollEl.style.width = w + 'px';
-  boardScrollEl.style.height = h + 'px';
+  baseSquareSize = Math.max(160, Math.floor(Math.min(rect.width, rect.height)) - 20);
+  applyZoom();
 }
 window.addEventListener('resize', ()=>{ setAppVH(); fitCanvasArea(); });
 window.addEventListener('orientationchange', ()=> setTimeout(()=>{ setAppVH(); fitCanvasArea(); }, 250));
@@ -691,10 +554,10 @@ const zoomInBtn = document.getElementById('zoom-in');
 const zoomOutBtn = document.getElementById('zoom-out');
 
 function applyZoom(){
-  const sizePercent = zoomLevel * 100;
-  canvasStackEl.style.width = sizePercent + '%';
-  canvasStackEl.style.height = sizePercent + '%';
-  zoomLabel.textContent = Math.round(sizePercent) + '%';
+  const size = Math.round(baseSquareSize * zoomLevel);
+  canvasStackEl.style.width = size + 'px';
+  canvasStackEl.style.height = size + 'px';
+  zoomLabel.textContent = Math.round(zoomLevel * 100) + '%';
   zoomOutBtn.disabled = zoomLevel <= MIN_ZOOM;
   zoomInBtn.disabled = zoomLevel >= MAX_ZOOM;
 }
@@ -707,8 +570,9 @@ zoomOutBtn.addEventListener('click', ()=>{
   applyZoom();
 });
 zoomLabel.addEventListener('click', ()=>{
-  zoomLevel = 1; applyZoom(); boardScrollEl.scrollTo(0,0);
+  zoomLevel = 1; applyZoom(); canvasAreaEl.scrollTo(0,0);
 });
+fitCanvasArea();
 
 /* ---------- モーダルの開閉 ---------- */
 function openModal(id){ document.getElementById(id).classList.add('open'); }
@@ -728,6 +592,15 @@ let materials = [
 let currentMaterialId = 'dog';
 const materialsGrid = document.getElementById('materials-grid');
 
+function generateBuiltinThumbnails(){
+  materials.forEach(m=>{
+    if(m.type === 'builtin' && !m.thumbDataUrl){
+      m.render();
+      m.thumbDataUrl = lineCanvas.toDataURL('image/png');
+    }
+  });
+}
+
 function renderMaterialsGrid(){
   materialsGrid.innerHTML = '';
   materials.forEach(m=>{
@@ -735,13 +608,9 @@ function renderMaterialsGrid(){
     chip.className = 'material-chip' + (m.id===currentMaterialId ? ' active' : '');
     const thumb = document.createElement('div');
     thumb.className = 'material-thumb';
-    if(m.type === 'builtin'){
-      thumb.textContent = m.id === 'dog' ? '🐶' : '🐱';
-    } else {
-      const img = document.createElement('img');
-      img.src = m.thumbDataUrl;
-      thumb.appendChild(img);
-    }
+    const img = document.createElement('img');
+    img.src = m.thumbDataUrl;
+    thumb.appendChild(img);
     const label = document.createElement('div');
     label.className = 'material-label';
     label.textContent = m.label;
@@ -828,7 +697,6 @@ function handleMaterialFiles(e){
       img.onload = ()=>{
         const lineImageData = imageToLineData(img);
         const id = 'material-' + Date.now() + '-' + idx;
-        // 線だけの絵(ほぼ透明なPNG)にしてから保存する。容量が小さくすむため。
         const lineDataUrl = imageDataToDataUrl(lineImageData);
         materials.push({
           id, label: 'そざい' + (materials.filter(m=>m.type==='image').length + 1),
@@ -854,7 +722,6 @@ function saveMaterialsToStorage(){
       .map(m => ({ id:m.id, label:m.label, lineDataUrl:m.thumbDataUrl }));
     localStorage.setItem(MATERIALS_STORAGE_KEY, JSON.stringify(list));
   }catch(err){
-    // 保存できる容量をこえた場合など。アプリ自体は問題なく使えるようにそのまま続ける。
     showToast('⚠️ そざいの保存容量がいっぱいかもしれません');
   }
 }
@@ -1072,9 +939,6 @@ function applyMaskToPreview(){
   previewCtx.restore();
 }
 
-/* 線のフチがぼやけて半透明になっていると、あとから別の線が重なったときに
-   うっすら「わく」のように見えてしまうため、色がついた部分は完全に不透明、
-   ついていない部分は完全に透明、の二択にそろえる(アンチエイリアスを消す) */
 function crispifyPreviewAlpha(){
   const img = previewCtx.getImageData(0,0,W,H);
   const d = img.data;
@@ -1107,8 +971,8 @@ function startDraw(e){
     pinchStartZoom = zoomLevel;
     const mid = touchMidpoint(e.touches[0], e.touches[1]);
     pinchStartMidX = mid.x; pinchStartMidY = mid.y;
-    pinchStartScrollLeft = boardScrollEl.scrollLeft;
-    pinchStartScrollTop = boardScrollEl.scrollTop;
+    pinchStartScrollLeft = canvasAreaEl.scrollLeft;
+    pinchStartScrollTop = canvasAreaEl.scrollTop;
     return;
   }
   if(e.touches && e.touches.length > 1) return;
@@ -1141,17 +1005,15 @@ function startDraw(e){
 function moveDraw(e){
   if(e.touches && e.touches.length === 2 && pinchStartDist){
     e.preventDefault();
-    // 指のひろがり具合でズーム
     const newDist = touchDistance(e.touches[0], e.touches[1]);
     const ratio = newDist / pinchStartDist;
     zoomLevel = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, +(pinchStartZoom * ratio).toFixed(2)));
     applyZoom();
-    // 2本指の中心の移動ぶんだけ、横・縦にずらす(パン)
     const mid = touchMidpoint(e.touches[0], e.touches[1]);
     const dx = mid.x - pinchStartMidX;
     const dy = mid.y - pinchStartMidY;
-    boardScrollEl.scrollLeft = pinchStartScrollLeft - dx;
-    boardScrollEl.scrollTop = pinchStartScrollTop - dy;
+    canvasAreaEl.scrollLeft = pinchStartScrollLeft - dx;
+    canvasAreaEl.scrollTop = pinchStartScrollTop - dy;
     return;
   }
   if(!isDrawing) return;
@@ -1239,17 +1101,13 @@ function floodFill(startX, startY, fillHex){
 }
 
 /* ---------- さいしょの1まいを描く ---------- */
+generateBuiltinThumbnails();
 renderMaterialsGrid();
 selectMaterial('dog');
-fitCanvasArea();
-applyZoom();
 loadMaterialsFromStorage();
 window.addEventListener('load', fitCanvasArea);
 
-/* ---------- ホーム画面アプリ化(サービスワーカー) ----------
-   file:// で直接開いた場合や、対応していないブラウザでは自動的にスキップされる。
-   https:// で公開ホスティングしたときに、オフライン利用・インストールが有効になる。
-------------------------------------------------------------------- */
+/* ---------- ホーム画面アプリ化(サービスワーカー) ---------- */
 if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
   window.addEventListener('load', ()=>{
     navigator.serviceWorker.register('service-worker.js').catch(()=>{});
