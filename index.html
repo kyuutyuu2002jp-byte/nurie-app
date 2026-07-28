@@ -785,7 +785,8 @@ function buildMaskAndRegions(){
 const IMAGE_BUILTINS = {
   cat: './cat.png',
   dog: './dog.png',
-  anpanman: './anpanman.png',
+  anpanman1: './anpanman1.png',
+  anpanman2: './anpanman2.png',
   car: './car.png' // 追加したい画像の情報を書いてください
 };
 
@@ -1009,10 +1010,9 @@ function renderPicGrid(){
   [
     {id:'cat', label:'🐱 ねこ'},
     {id:'dog', label:'🐶 いぬ'},
-    {id:'anpanman', label:' アンパンマン'},
+    {id:'anpanman', label:' アンパンマン1'},
+    {id:'anpanman', label:' アンパンマン2'},
     {id:'car', label:'🚗 くるま'}, // 追加したいボタンの情報を書いてください
-    {id:'house', label:'🏠 おうち'},
-    {id:'rocket', label:'🚀 ロケット'}
   ].forEach(item=>{
     const b = document.createElement('button');
     b.innerHTML = item.label;
