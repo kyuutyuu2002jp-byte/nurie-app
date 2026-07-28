@@ -2,1117 +2,1412 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>ぬりえあそび</title>
-
-<!-- ホーム画面に追加したときのアプリ設定 -->
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#ff7a59">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<!-- ===== PWA / アプリモード用メタタグ ===== -->
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="ぬりえ">
-<meta name="mobile-web-app-capable" content="yes">
-
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<meta name="apple-mobile-web-app-title" content="ぬりえあそび">
+<meta name="theme-color" content="#FFB6C1">
+<link rel="apple-touch-icon" href="./icon.png">
+<link rel="icon" href="./icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Yusei+Magic&family=M+PLUS+Rounded+1c:wght@700;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg: #fff6e9;
-    --panel: #ffffff;
-    --ink: #3a3226;
-    --accent1: #ff7a59;
-    --accent2: #4fb3a9;
-    --accent3: #ffd23f;
-    --line: #e3d9c6;
+    --bg-sky:#BFE7FF;
+    --bg-cream:#FFF7E0;
+    --pink:#FF6FA5;
+    --pink-deep:#E8508C;
+    --yellow:#FFC93C;
+    --green:#69D48A;
+    --purple:#B18CFF;
+    --ink:#4A3B32;
+    --panel:#FFFFFFEE;
+    --shadow:0 6px 0 rgba(0,0,0,0.15);
   }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  html, body{ height:100%; overscroll-behavior:none; }
-  body{
-    margin:0;
-    overflow:hidden;
-    font-family:"Baloo 2", sans-serif;
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none;}
+  html,body{
+    position:fixed; inset:0; width:100%; height:100%;
+    margin:0; padding:0; overflow:hidden; overscroll-behavior:none;
+    background:linear-gradient(180deg,var(--bg-sky),var(--bg-cream));
+    font-family:'M PLUS Rounded 1c','Yusei Magic',sans-serif;
     color:var(--ink);
-    height:calc(var(--app-vh, 1vh) * 100);
-    position:relative;
+    touch-action:none;
   }
-
-  /* ---------- キャンバスを画面まるごとに広げる ---------- */
-  .canvas-area{
-    position:fixed;
-    inset:0;
+  #stage{
+    position:absolute; inset:0;
+    padding-top:env(safe-area-inset-top);
+    padding-bottom:env(safe-area-inset-bottom);
+    padding-left:env(safe-area-inset-left);
+    padding-right:env(safe-area-inset-right);
+  }
+  #viewport{
+    position:absolute; inset:0; overflow:hidden;
+    touch-action:none;
+  }
+  #canvasWorld{
+    position:absolute; left:0; top:0;
     background:#fff;
-    overflow:auto;
-    -webkit-overflow-scrolling:touch;
-    display:flex;
-    align-items:center;
-    justify-content:center;
+    box-shadow:0 4px 24px rgba(0,0,0,0.15);
+    transform-origin: 0 0;
+    will-change:transform;
   }
-  .canvas-stack{ position:relative; flex:0 0 auto; }
-  .canvas-stack canvas{ position:absolute; top:0; left:0; width:100%; height:100%; display:block; }
-  #colorLayer{ background:#fff; touch-action:none; cursor:crosshair; z-index:1; }
-  #previewLayer{ background:transparent; pointer-events:none; z-index:2; }
-  #lineLayer{ background:transparent; pointer-events:none; z-index:3; }
-
-  /* ---------- 画面の下に浮かせる、どうぐバー(ラベルつき) ---------- */
-  .floating-toolbar{
-    position:fixed;
-    left:50%;
-    bottom:calc(env(safe-area-inset-bottom) + 10px);
-    transform:translateX(-50%);
-    z-index:60;
-    display:flex;
-    flex-direction:column;
-    gap:6px;
-    background:rgba(255,255,255,0.96);
-    padding:8px 10px;
-    border-radius:22px;
-    box-shadow:0 6px 18px rgba(58,50,38,0.18);
-    max-width:calc(100vw - 16px);
+  #canvasWorld canvas{
+    position:absolute; left:0; top:0;
+    image-rendering:pixelated;
   }
-  .toolbar-row{
-    display:flex;
-    flex-direction:row;
-    align-items:center;
-    gap:6px;
-    overflow-x:auto;
-    overflow-y:hidden;
-    touch-action:pan-x;
-    overscroll-behavior:contain;
+  #colorCanvas, #lineCanvas, #tempCanvas{ pointer-events:none; }
+  .tool-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:10px;}
+  .tool-grid button{
+    border:none; border-radius:18px; padding:14px 4px 10px; font-size:30px;
+    background:#f5f5f5; box-shadow:0 3px 0 rgba(0,0,0,0.1); cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:5px; line-height:1;
   }
-  .color-row{ height:40px; }
-  .brush-size-inline{ display:flex; align-items:center; gap:4px; width:80px; flex:0 0 auto; }
-  .brush-size-inline span{ font-size:14px; }
-  .fab{
-    width:auto; min-width:54px; height:52px;
-    border-radius:14px;
-    border:none;
-    background:#f4efe2;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:2px;
-    cursor:pointer;
-    padding:5px 8px;
-    flex:0 0 auto;
-    color:var(--ink);
+  .tool-grid button .tl{ font-size:14px; font-weight:800; color:var(--ink); }
+  .tool-grid button.active{ background:var(--green); box-shadow:0 3px 0 rgba(0,0,0,0.2) inset;}
+  .slider-row{ display:flex; align-items:center; gap:8px; margin:8px 2px; font-size:15px; font-weight:800;}
+  .slider-row input[type=range]{ flex:1; height:26px; }
+  .swatch-grid{ display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-bottom:8px;}
+  .swatch{
+    width:100%; aspect-ratio:1; border-radius:50%; border:3px solid white;
+    box-shadow:0 2px 6px rgba(0,0,0,0.25); cursor:pointer;
   }
-  .fab-icon{ font-size:18px; line-height:1; }
-  .fab-label{ font-size:10px; font-weight:700; line-height:1; white-space:nowrap; }
-  .fab.active{ background:var(--accent2); color:#fff; }
-  .fab.save{ background:var(--accent1); color:#fff; }
-  .fab:disabled{ opacity:0.4; cursor:not-allowed; }
-  .toolbar-divider{ width:1px; height:32px; background:var(--line); flex:0 0 auto; margin:0 2px; }
-  .color-dot{
-    width:22px; height:22px;
-    border-radius:50%;
-    display:block;
-    border:2px solid #fff;
-    box-shadow:0 0 0 1.5px var(--line);
+  .swatch.selected{ outline:3px solid var(--pink-deep); }
+  .mini-btn{
+    border:none; border-radius:16px; padding:12px 10px; font-size:15px; font-weight:800;
+    background:var(--purple); color:#fff; box-shadow:0 3px 0 rgba(0,0,0,0.15); cursor:pointer;
+    width:100%; margin-top:8px;
   }
-
-  /* ---------- ズームは左上に小さく浮かせる ---------- */
-  .zoom-controls{
-    position:fixed;
-    top:calc(env(safe-area-inset-top) + 10px);
-    left:calc(env(safe-area-inset-left) + 10px);
-    z-index:60;
-    display:flex;
-    align-items:center;
-    gap:2px;
-    background:rgba(255,255,255,0.92);
-    border-radius:999px;
-    padding:3px;
-    box-shadow:0 2px 8px rgba(58,50,38,0.15);
+  .mini-btn.secondary{ background:#fff; color:var(--ink); }
+  .mini-btn.warn{ background:#FF8A65; }
+  #kanaPanel{ max-height:150px; overflow-y:auto; display:grid; grid-template-columns:repeat(5,1fr); gap:4px; }
+  #kanaPanel button{ border:none; border-radius:9px; padding:5px 0; background:#fff; box-shadow:0 2px 0 rgba(0,0,0,0.12); font-size:14px;}
+  #kanaPanel button.active{ background:var(--yellow); }
+  .mix-row{ display:flex; align-items:center; justify-content:center; gap:10px; margin:6px 0;}
+  .mix-slot{ width:44px; height:44px; border-radius:50%; border:3px dashed #bbb; }
+  .mix-arrow{ font-size:20px; }
+  #mixResult{ width:44px; height:44px; border-radius:50%; border:3px solid white; box-shadow:0 2px 6px rgba(0,0,0,.25);}
+  .corner-btns{ position:fixed; z-index:40; display:flex; flex-direction:column; gap:10px;}
+  .corner-btns.top{ top:calc(12px + env(safe-area-inset-top)); right:calc(12px + env(safe-area-inset-right)); }
+  .corner-btns.top-left{ top:calc(12px + env(safe-area-inset-top)); left:calc(12px + env(safe-area-inset-left)); }
+  .round-fab{
+    width:60px; min-height:56px; border-radius:20px; border:none;
+    background:var(--panel); box-shadow:0 6px 14px rgba(0,0,0,0.2); cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+    padding:6px 2px;
   }
-  .zoom-btn{
-    width:28px; height:28px; border-radius:50%; border:none;
-    background:#f4efe2; color:var(--ink); font-weight:800; font-size:15px;
-    cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;
-  }
-  .zoom-btn:disabled{ color:#c9beac; cursor:not-allowed; }
-  .zoom-label{ font-size:11px; font-weight:700; color:#8a7f6c; width:38px; text-align:center; cursor:pointer; }
-
-  /* ---------- モーダル(そざい・さくひん・いろ) ---------- */
-  .modal-overlay{
-    position:fixed; inset:0;
-    background:rgba(58,50,38,0.55);
-    z-index:80;
-    display:none;
-    align-items:flex-end;
-    justify-content:center;
-  }
-  .modal-overlay.open{ display:flex; }
-  .modal-sheet{
-    background:var(--panel);
-    width:100%;
-    max-width:520px;
-    max-height:78vh;
-    overflow-y:auto;
-    border-radius:24px 24px 0 0;
-    padding:16px;
-    padding-bottom:calc(16px + env(safe-area-inset-bottom));
-    box-shadow:0 -6px 20px rgba(0,0,0,0.15);
-    transform:translateY(16px);
-    opacity:0;
-    transition:transform .2s ease, opacity .2s ease;
-  }
-  .modal-overlay.open .modal-sheet{ transform:translateY(0); opacity:1; }
-  .modal-header{
-    display:flex; align-items:center; justify-content:space-between;
-    font-weight:800; font-size:16px; margin-bottom:12px;
-  }
-  .modal-close{
-    border:none; background:#f4efe2; width:30px; height:30px; border-radius:50%;
-    font-weight:800; cursor:pointer;
-  }
-
-  .materials-grid{ display:flex; flex-wrap:wrap; gap:12px; }
-  .material-chip{
-    flex:0 0 auto; width:76px; display:flex; flex-direction:column; align-items:center; gap:5px;
-    border:none; background:none; cursor:pointer; padding:2px;
-  }
-  .material-thumb{
-    width:68px; height:68px; border-radius:16px; background:#f4efe2;
-    border:3px solid transparent; display:flex; align-items:center; justify-content:center;
-    font-size:30px; overflow:hidden;
-  }
-  .material-chip.active .material-thumb{ border-color:var(--accent2); background:#e6f5f3; }
-  .material-thumb img{ width:100%; height:100%; object-fit:cover; }
-  .material-label{ font-size:11px; font-weight:700; color:#8a7f6c; max-width:76px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .material-chip.add-chip .material-thumb{ border:2px dashed var(--line); background:transparent; color:var(--accent1); }
-
-  .materials-transfer-row{ display:flex; gap:10px; margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
-  .import-btn-wrap{ position:relative; }
-  .import-btn-wrap input[type=file]{ position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; margin:0; padding:0; cursor:pointer; }
-  .materials-transfer-hint{ font-size:11px; color:#8a7f6c; margin-top:8px; line-height:1.5; }
-  .icon-btn{
-    border:none; background:var(--panel); box-shadow:0 4px 0 var(--line); border-radius:14px;
-    padding:8px 12px; font-family:inherit; font-weight:700; font-size:13px;
-    display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--ink); white-space:nowrap;
-  }
-
-  .gallery-empty{ font-size:13px; color:#c2b8a4; }
-  .gallery-grid{ display:flex; flex-wrap:wrap; gap:10px; }
-  .gallery-item{ position:relative; width:76px; height:76px; border-radius:12px; overflow:hidden; border:2px solid var(--line); cursor:pointer; }
-  .gallery-item img{ width:100%; height:100%; object-fit:cover; display:block; }
-  .gallery-del{
-    position:absolute; top:2px; right:2px; width:20px; height:20px; border-radius:50%;
-    border:none; background:rgba(60,50,40,0.75); color:#fff; font-size:12px;
-    line-height:20px; text-align:center; padding:0; cursor:pointer;
-  }
-
-  /* ---------- いろピッカー(モーダル内) ---------- */
-  .brush-size-row{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
-  .brush-size-row span{ font-size:18px; }
-  input[type=range]{ accent-color:var(--accent1); flex:1; }
-  .color-row{ flex-wrap:nowrap; }
-  .swatch{ width:32px; height:32px; border-radius:50%; border:3px solid #fff; box-shadow:0 0 0 2px var(--line); cursor:pointer; padding:0; display:block; flex-shrink:0; }
-  .swatch.active{ box-shadow:0 0 0 3px var(--ink); transform:scale(1.08); }
-  .swatch-wrap{ position:relative; width:32px; height:32px; flex-shrink:0; }
-  .swatch-del{
-    position:absolute; top:-5px; right:-5px; width:15px; height:15px; border-radius:50%;
-    border:none; background:rgba(60,50,40,0.8); color:#fff; font-size:9px; line-height:15px;
-    text-align:center; padding:0; cursor:pointer;
-  }
-  .swatch-add-wrap{ position:relative; width:32px; height:32px; flex-shrink:0; }
-  .swatch-add-visual{
-    width:32px; height:32px; border-radius:50%;
-    border:2px dashed var(--line); background:transparent; color:var(--accent1);
-    font-weight:800; font-size:16px; cursor:pointer;
+  .round-fab .fab-ico{ font-size:22px; line-height:1; }
+  .round-fab .fab-txt{ font-size:10px; font-weight:800; color:var(--ink); line-height:1; }
+  #colorBtn{ border:4px solid #FF6FA5; }
+  #colorBadge{
+    position:fixed; left:calc(12px + env(safe-area-inset-left));
+    bottom:calc(16px + env(safe-area-inset-bottom));
+    z-index:41; border:none; cursor:pointer;
+    width:64px; height:64px; border-radius:50%;
+    background:var(--panel); box-shadow:0 6px 14px rgba(0,0,0,0.25);
     display:flex; align-items:center; justify-content:center;
-    pointer-events:none;
+    padding:0;
   }
-  .swatch-add-input{ position:absolute; top:0; left:0; width:32px; height:32px; opacity:0; padding:0; border:0; margin:0; cursor:pointer; }
-
-  .toast{
-    position:fixed;
-    left:50%;
-    bottom:calc(30px + env(safe-area-inset-bottom));
-    transform:translateX(-50%) translateY(16px);
-    background:rgba(58,50,38,0.92);
-    color:#fff;
-    padding:10px 22px;
-    border-radius:999px;
-    font-weight:700;
-    font-size:14px;
-    white-space:nowrap;
-    opacity:0;
-    pointer-events:none;
-    transition:opacity .25s ease, transform .25s ease;
-    z-index:300;
+  #colorBadge .swatchDot{
+    width:44px; height:44px; border-radius:50%;
+    border:3px solid #fff; box-shadow:0 0 0 2px rgba(0,0,0,0.15);
   }
-  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  #colorBadge .brush{
+    position:absolute; top:-4px; right:-4px; font-size:18px;
+    background:#fff; border-radius:50%; padding:2px; box-shadow:0 2px 4px rgba(0,0,0,0.2);
+  }
+  #doneBtn{
+    position:fixed; left:50%; transform:translateX(-50%);
+    bottom:calc(16px + env(safe-area-inset-bottom));
+    z-index:40; border:none; border-radius:30px; padding:14px 28px; font-size:18px; font-weight:800;
+    background:var(--pink); color:#fff; box-shadow:0 8px 0 var(--pink-deep); cursor:pointer;
+  }
+  .overlay{
+    position:fixed; inset:0; background:rgba(20,20,30,0.55); z-index:100;
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .overlay.show{ display:flex; }
+  .modal{
+    background:#fff; border-radius:26px; padding:22px; width:min(92vw,420px);
+    max-height:86vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.3);
+    text-align:center;
+  }
+  .modal h2{ margin:0 0 12px; font-size:20px; }
+  .big-input{
+    width:80px; font-size:26px; text-align:center; padding:8px; border-radius:12px;
+    border:2px solid #ccc; margin:0 6px;
+  }
+  #sleepScreen{
+    position:fixed; inset:0; background:linear-gradient(180deg,#2b2a52,#4a4080);
+    z-index:200; display:none; align-items:center; justify-content:center; flex-direction:column;
+    color:white; text-align:center;
+  }
+  #sleepScreen.show{ display:flex; }
+  #sleepScreen .zzz{ font-size:70px; }
+  #confettiCanvas{ position:fixed; inset:0; z-index:150; pointer-events:none; display:none; }
+  #cropOverlay{ background:rgba(0,0,0,0.85); }
+  #cropStageWrap{ position:relative; width:min(85vw,360px); height:min(85vw,360px); overflow:hidden; border-radius:12px; touch-action:none; }
+  #cropImg{ position:absolute; left:0; top:0; transform-origin:0 0; touch-action:none; }
+  #cropFrame{ position:absolute; inset:0; border:3px solid #fff; box-shadow:0 0 0 2000px rgba(0,0,0,0.55); pointer-events:none; border-radius:8px;}
+  .savedThumbs{ display:flex; gap:8px; overflow-x:auto; padding:6px 0; }
+  .savedThumbs img{ width:52px; height:52px; object-fit:cover; border-radius:10px; border:2px solid #eee; }
+  .thumb-wrap{ position:relative; }
+  .thumb-del{ position:absolute; top:-6px; right:-6px; background:#FF6B6B; color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:12px; line-height:1;}
+  ::-webkit-scrollbar{ width:6px; height:6px; }
+  ::-webkit-scrollbar-thumb{ background:#ddd; border-radius:3px; }
 </style>
 </head>
 <body>
-
-  <div class="canvas-area" id="canvas-area">
-    <div class="canvas-stack" id="canvas-stack">
-      <canvas id="colorLayer" width="560" height="560"></canvas>
-      <canvas id="previewLayer" width="560" height="560"></canvas>
-      <canvas id="lineLayer" width="560" height="560"></canvas>
+<div id="stage">
+  <div id="viewport">
+    <div id="canvasWorld">
+      <canvas id="colorCanvas"></canvas>
+      <canvas id="lineCanvas"></canvas>
+      <canvas id="tempCanvas"></canvas>
     </div>
   </div>
-
-  <div class="zoom-controls">
-    <button class="zoom-btn" id="zoom-out">－</button>
-    <span class="zoom-label" id="zoom-label" title="タップで100%に戻す">100%</span>
-    <button class="zoom-btn" id="zoom-in">＋</button>
-  </div>
-
-  <div class="floating-toolbar">
-    <div class="toolbar-row">
-      <button class="fab" id="open-materials" title="そざい"><span class="fab-icon">🐶</span><span class="fab-label">そざい</span></button>
-      <button class="fab" id="open-gallery" title="さくひん"><span class="fab-icon">📁</span><span class="fab-label">さくひん</span></button>
-      <div class="toolbar-divider"></div>
-      <button class="fab active" id="tool-pen" title="ペン"><span class="fab-icon">✏️</span><span class="fab-label">ペン</span></button>
-      <button class="fab" id="tool-fill" title="ぬりつぶし"><span class="fab-icon">🪣</span><span class="fab-label">ぬり</span></button>
-      <div class="brush-size-inline"><span>●</span><input type="range" id="brush-size" min="2" max="30" value="10"></div>
-      <div class="toolbar-divider"></div>
-      <button class="fab" id="btn-undo" title="もどす"><span class="fab-icon">↩️</span><span class="fab-label">もどす</span></button>
-      <button class="fab" id="btn-clear" title="はじめから"><span class="fab-icon">🔄</span><span class="fab-label">はじめから</span></button>
-      <button class="fab save" id="btn-save" title="ほぞんする"><span class="fab-icon">💾</span><span class="fab-label">ほぞん</span></button>
+</div>
+<div class="corner-btns top-left">
+  <button class="round-fab" id="openDrawBtn" title="どうぐをえらぶ"><span class="fab-ico">✏️</span><span class="fab-txt">どうぐ</span></button>
+  <button class="round-fab" id="openToolBtn" title="もどす・けす"><span class="fab-ico">⚙️</span><span class="fab-txt">そのた</span></button>
+</div>
+<div class="corner-btns top">
+  <button class="round-fab" id="colorBtn" title="いろをえらぶ"><span class="fab-ico">🎨</span><span class="fab-txt">いろ</span></button>
+  <button class="round-fab" id="picBtn" title="えをかえる"><span class="fab-ico">🖼️</span><span class="fab-txt">えを かえる</span></button>
+  <button class="round-fab" id="soundBtn" title="おんがく"><span class="fab-ico">🔊</span><span class="fab-txt">おんがく</span></button>
+  <button class="round-fab" id="timerBtn" title="おしまいタイマー"><span class="fab-ico">⏰</span><span class="fab-txt">タイマー</span></button>
+</div>
+<button id="colorBadge" title="いまの いろ">
+  <span class="swatchDot" id="swatchDot"></span>
+  <span class="brush">🖌️</span>
+</button>
+<button id="doneBtn">✅ できた！</button>
+<div class="overlay" id="drawOverlay">
+  <div class="modal">
+    <h2>✏️ どうぐを えらんでね</h2>
+    <p style="font-size:13px;color:#888;margin:0 0 8px;">タップした どうぐで えに いろを つけられるよ</p>
+    <div class="tool-grid">
+      <button data-tool="pen" class="active"><span class="ti">✏️</span><span class="tl">ペンで かく</span></button>
+      <button data-tool="bucket"><span class="ti">🪣</span><span class="tl">いっきに ぬる</span></button>
+      <button data-tool="spray"><span class="ti">💨</span><span class="tl">シュッと ふきつけ</span></button>
+      <button data-tool="stamp"><span class="ti">🔤</span><span class="tl">もじを ペタン</span></button>
     </div>
-    <div class="toolbar-row color-row" id="palette-swatches"></div>
+    <div class="slider-row">
+      <span>✏️ ふとさ</span>
+      <input type="range" id="sizeSlider" min="4" max="60" value="18">
+    </div>
+    <div id="kanaWrap" style="display:none;">
+      <p style="font-size:13px;color:#888;margin:4px 0;">ペタンと おしたい もじを えらんでね</p>
+      <div id="kanaPanel"></div>
+    </div>
+    <button class="mini-btn secondary" id="drawCloseBtn">とじる</button>
   </div>
-
-  <!-- そざいをえらぶモーダル -->
-  <div class="modal-overlay" id="materials-overlay">
-    <div class="modal-sheet">
-      <div class="modal-header"><span>そざいをえらぶ</span><button class="modal-close" id="materials-close">✕</button></div>
-      <div class="materials-grid" id="materials-grid"></div>
-      <div class="materials-transfer-row">
-        <button class="icon-btn" id="export-materials">⬇️ 書き出す</button>
-        <div class="import-btn-wrap">
-          <span class="icon-btn" style="pointer-events:none;">⬆️ 読み込む</span>
-          <input type="file" id="import-materials-input" accept="application/json,.json">
-        </div>
+</div>
+<div class="overlay" id="toolOverlay">
+  <div class="modal">
+    <h2>⚙️ そのほかの ボタン</h2>
+    <p style="font-size:13px;color:#888;margin:0 0 8px;">まえに もどしたり、けしたり できるよ</p>
+    <button class="mini-btn secondary" id="undoBtn">↩️ ひとつ まえに もどす</button>
+    <button class="mini-btn warn" id="clearBtn">🗑️ ぜんぶ けす</button>
+    <button class="mini-btn secondary" id="zoomResetBtn">🔍 おおきさを もとに もどす</button>
+    <button class="mini-btn secondary" id="toolCloseBtn">とじる</button>
+  </div>
+</div>
+<div class="overlay" id="colorOverlay">
+  <div class="modal">
+    <h2>🎨 いろを えらんでね</h2>
+    <p style="font-size:13px;color:#888;margin:0 0 8px;">ひだりしたの ● まるが いまの いろだよ</p>
+    <div class="swatch-grid" id="swatchGrid"></div>
+    <button class="mini-btn secondary" id="mixOpenBtn">🌈 まほうのパレット</button>
+    <button class="mini-btn secondary" id="colorCloseBtn">とじる</button>
+  </div>
+</div>
+<div class="overlay" id="mixOverlay">
+  <div class="modal">
+    <h2>🌈 まほうのパレット</h2>
+    <p>いろを２つえらんでね</p>
+    <div class="mix-row">
+      <div class="mix-slot" id="mixSlotA"></div>
+      <span class="mix-arrow">＋</span>
+      <div class="mix-slot" id="mixSlotB"></div>
+      <span class="mix-arrow">＝</span>
+      <div id="mixResult"></div>
+    </div>
+    <div class="swatch-grid" id="mixSwatchGrid"></div>
+    <button class="mini-btn" id="mixGoBtn">まぜる！</button>
+    <button class="mini-btn secondary" id="mixUseBtn" style="display:none;">この色を使う！</button>
+    <button class="mini-btn secondary" id="mixCloseBtn">とじる</button>
+  </div>
+</div>
+<div class="overlay" id="picOverlay">
+  <div class="modal">
+    <h2>🖼️ ぬりえの えを えらぼう</h2>
+    <p style="font-size:13px;color:#888;margin:0 0 8px;">すきな しゃしんや え を じぶんで ついかできるよ</p>
+    <button class="mini-btn" id="addPhotoBtn" style="background:var(--pink);">📷 しゃしん・イラストを ついかする（おとなの人へ）</button>
+    <input type="file" id="fileInput" accept="image/*" style="display:none;">
+    <div class="savedThumbs" id="savedThumbs"></div>
+    <hr style="border:none;border-top:2px dashed #eee;margin:14px 0;">
+    <p style="font-size:13px;color:#888;margin:0 0 8px;">よういした えから えらぶ こともできるよ</p>
+    <div class="tool-grid" id="picGrid" style="grid-template-columns:repeat(3,1fr);"></div>
+    <button class="mini-btn secondary" id="picCloseBtn">とじる</button>
+  </div>
+</div>
+<div class="overlay" id="cropOverlay">
+  <div class="modal" style="background:#222; color:#fff;">
+    <h2>✂️ きりぬく ばしょをきめてね</h2>
+    <div style="display:flex; justify-content:center;">
+      <div id="cropStageWrap">
+        <img id="cropImg" src="">
+        <div id="cropFrame"></div>
       </div>
-      <div class="materials-transfer-hint">「書き出す」で作ったファイルを、別のスマホで「読み込む」から選ぶと、同じそざいが使えるようになります。</div>
     </div>
-  </div>
-
-  <!-- ほぞんした さくひんモーダル -->
-  <div class="modal-overlay" id="gallery-overlay">
-    <div class="modal-sheet">
-      <div class="modal-header"><span>ほぞんした さくひん</span><button class="modal-close" id="gallery-close">✕</button></div>
-      <div class="gallery-empty" id="gallery-empty">まだありません</div>
-      <div class="gallery-grid" id="gallery-grid"></div>
+    <div class="slider-row" style="color:#fff;">
+      <span>🔍</span>
+      <input type="range" id="cropZoom" min="100" max="400" value="100">
     </div>
+    <button class="mini-btn" id="cropOkBtn">✅ これでOK</button>
+    <button class="mini-btn secondary" id="cropCancelBtn">キャンセル</button>
   </div>
-
-  <div class="toast" id="toast"></div>
+</div>
+<div class="overlay" id="mathOverlay">
+  <div class="modal">
+    <h2 id="mathTitle">🔐 おとなの人だけ</h2>
+    <p id="mathQ" style="font-size:24px;font-weight:800;"></p>
+    <input type="tel" id="mathInput" class="big-input" inputmode="numeric" pattern="[0-9]*">
+    <button class="mini-btn" id="mathOkBtn">こたえる</button>
+    <p id="mathMsg" style="color:#E8508C; font-weight:800;"></p>
+  </div>
+</div>
+<div class="overlay" id="timerSetOverlay">
+  <div class="modal">
+    <h2>⏰ おしまいタイマー</h2>
+    <p>あと なんぷんで おしまいにする？</p>
+    <select id="timerSelect" style="font-size:20px; padding:8px; border-radius:12px;"></select>
+    <button class="mini-btn" id="timerStartBtn" style="margin-top:14px;">スタート</button>
+    <button class="mini-btn secondary" id="timerCancelSetBtn">タイマーをけす</button>
+    <button class="mini-btn secondary" id="timerCloseBtn">とじる</button>
+  </div>
+</div>
+<div id="sleepScreen">
+  <div class="zzz">😴💤</div>
+  <h2>じかんが きたよ。おしまい！</h2>
+  <p>おとなの人に あけてもらってね</p>
+  <button class="mini-btn" style="width:220px;" id="sleepUnlockBtn">🔐 かいじょする（おとな）</button>
+</div>
+<div class="overlay" id="doneOverlay">
+  <div class="modal">
+    <h2>🎉 じょうずに ぬれたね！ 🎉</h2>
+    <p>がぞうを ほぞんしたよ</p>
+    <button class="mini-btn" id="doneCloseBtn">やったー！</button>
+  </div>
+</div>
+<canvas id="confettiCanvas"></canvas>
 
 <script>
-/* ---------- キャンバスを3まい用意する ---------- */
-const colorCanvas = document.getElementById('colorLayer');
-const colorCtx = colorCanvas.getContext('2d');
-const previewCanvas = document.getElementById('previewLayer');
-const previewCtx = previewCanvas.getContext('2d');
-const lineCanvas = document.getElementById('lineLayer');
-const lineCtx = lineCanvas.getContext('2d');
-const W = colorCanvas.width, H = colorCanvas.height;
+(function(){
+"use strict";
 
-/* ---------- 1. したえ(線画) ---------- */
+const W = 1000, H = 1300;
+const colorCanvas = document.getElementById('colorCanvas');
+const lineCanvas  = document.getElementById('lineCanvas');
+const tempCanvas  = document.getElementById('tempCanvas');
+const world = document.getElementById('canvasWorld');
+const viewport = document.getElementById('viewport');
 
-function drawDogOutline(){
-  lineCtx.clearRect(0,0,W,H);
-  lineCtx.strokeStyle = '#2c2620';
-  lineCtx.lineWidth = 7;
-  lineCtx.lineJoin = 'round';
-  lineCtx.lineCap = 'round';
+[colorCanvas, lineCanvas, tempCanvas].forEach(c=>{ c.width=W; c.height=H; });
+world.style.width = W+'px';
+world.style.height = H+'px';
 
-  [[190,410],[360,410],[220,450],[330,450]].forEach(([x,y])=>{
-    lineCtx.beginPath();
-    roundedRect(lineCtx, x, y, 36, 90, 14);
-    lineCtx.stroke();
-  });
+const colorCtx = colorCanvas.getContext('2d', {willReadFrequently:true});
+const lineCtx  = lineCanvas.getContext('2d', {willReadFrequently:true});
+const tempCtx  = tempCanvas.getContext('2d');
 
-  lineCtx.beginPath();
-  lineCtx.moveTo(430,350);
-  lineCtx.quadraticCurveTo(500,310,478,250);
-  lineCtx.quadraticCurveTo(470,235,452,250);
-  lineCtx.quadraticCurveTo(465,300,410,335);
-  lineCtx.closePath();
-  lineCtx.stroke();
+let lineMask = null;
+let regionMap = null;
+let regionCount = 0;
 
-  lineCtx.beginPath();
-  lineCtx.ellipse(280,370,150,95,0,0,Math.PI*2);
-  lineCtx.stroke();
+const state = {
+  tool:'pen',
+  color:'#FF6FA5',
+  size:18,
+  scale:1, tx:0, ty:0,
+  stampChar:'あ',
+  undoStack:[],
+};
 
-  lineCtx.beginPath();
-  lineCtx.arc(280,210,95,0,Math.PI*2);
-  lineCtx.stroke();
+function applyTransform(){
+  world.style.transform = `translate(${state.tx}px, ${state.ty}px) scale(${state.scale})`;
+}
+function fitToViewport(){
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  const s = Math.min(vw/W, vh/H) * 0.98;
+  state.scale = s;
+  state.tx = (vw - W*s)/2;
+  state.ty = (vh - H*s)/2;
+  applyTransform();
+}
+window.addEventListener('resize', fitToViewport);
 
-  lineCtx.beginPath();
-  lineCtx.ellipse(205,140,32,58,-0.35,0,Math.PI*2);
-  lineCtx.stroke();
-  lineCtx.beginPath();
-  lineCtx.ellipse(355,140,32,58,0.35,0,Math.PI*2);
-  lineCtx.stroke();
+let activePointers = new Map();
+let pinch = null;
+let drawing = false;
+let lastPt = null;
 
-  lineCtx.beginPath();
-  lineCtx.ellipse(280,245,48,32,0,0,Math.PI*2);
-  lineCtx.stroke();
-
-  lineCtx.fillStyle = '#2c2620';
-  lineCtx.beginPath(); lineCtx.arc(248,200,6,0,Math.PI*2); lineCtx.fill();
-  lineCtx.beginPath(); lineCtx.arc(312,200,6,0,Math.PI*2); lineCtx.fill();
-  lineCtx.beginPath(); lineCtx.ellipse(280,240,9,7,0,0,Math.PI*2); lineCtx.fill();
+function toWorldXY(clientX, clientY){
+  const rect = viewport.getBoundingClientRect();
+  const vx = clientX - rect.left, vy = clientY - rect.top;
+  const wx = (vx - state.tx) / state.scale;
+  const wy = (vy - state.ty) / state.scale;
+  return {x:wx, y:wy};
 }
 
-function drawCatOutline(){
-  lineCtx.clearRect(0,0,W,H);
-  lineCtx.strokeStyle = '#2c2620';
-  lineCtx.lineWidth = 7;
-  lineCtx.lineJoin = 'round';
-  lineCtx.lineCap = 'round';
+viewport.addEventListener('pointerdown', onVPDown, {passive:false});
+viewport.addEventListener('pointermove', onVPMove, {passive:false});
+viewport.addEventListener('pointerup', onVPUp, {passive:false});
+viewport.addEventListener('pointercancel', onVPUp, {passive:false});
+viewport.addEventListener('pointerleave', onVPUp, {passive:false});
 
-  lineCtx.beginPath();
-  lineCtx.moveTo(415,400);
-  lineCtx.quadraticCurveTo(500,400,505,320);
-  lineCtx.quadraticCurveTo(508,270,470,255);
-  lineCtx.quadraticCurveTo(480,290,472,320);
-  lineCtx.quadraticCurveTo(465,370,398,375);
-  lineCtx.closePath();
-  lineCtx.stroke();
+function onVPDown(e){
+  e.preventDefault();
+  activePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(activePointers.size === 2){
+    drawing = false;
+    const pts = Array.from(activePointers.values());
+    pinch = {
+      startDist: dist(pts[0],pts[1]),
+      startScale: state.scale,
+      startMid: mid(pts[0],pts[1]),
+      startTx: state.tx, startTy: state.ty
+    };
+  } else if(activePointers.size === 1){
+    startDrawing(e.clientX, e.clientY);
+  }
+}
+function onVPMove(e){
+  if(!activePointers.has(e.pointerId)) return;
+  e.preventDefault();
+  activePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(activePointers.size === 2 && pinch){
+    const pts = Array.from(activePointers.values());
+    const d = dist(pts[0],pts[1]);
+    const m = mid(pts[0],pts[1]);
+    const newScale = clamp(pinch.startScale * (d/pinch.startDist), 0.3, 4);
+    const rect = viewport.getBoundingClientRect();
+    const mx = pinch.startMid.x - rect.left, my = pinch.startMid.y - rect.top;
+    const dxMid = (m.x - pinch.startMid.x), dyMid = (m.y - pinch.startMid.y);
+    state.scale = newScale;
+    state.tx = pinch.startTx + dxMid - (mx*(newScale-pinch.startScale));
+    state.ty = pinch.startTy + dyMid - (my*(newScale-pinch.startScale));
+    applyTransform();
+  } else if(activePointers.size === 1 && drawing){
+    moveDrawing(e.clientX, e.clientY);
+  }
+}
+function onVPUp(e){
+  activePointers.delete(e.pointerId);
+  if(activePointers.size < 2) pinch = null;
+  if(activePointers.size === 0 && drawing){
+    endDrawing();
+  }
+}
+function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+function mid(a,b){ return {x:(a.x+b.x)/2, y:(a.y+b.y)/2}; }
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 
-  [[195,410],[350,410],[225,450],[320,450]].forEach(([x,y])=>{
-    lineCtx.beginPath();
-    roundedRect(lineCtx, x, y, 34, 85, 14);
-    lineCtx.stroke();
-  });
+function idx(x,y){ return y*W + x; }
+function inBounds(x,y){ return x>=0 && y>=0 && x<W && y<H; }
 
-  lineCtx.beginPath();
-  lineCtx.ellipse(275,365,140,90,0,0,Math.PI*2);
-  lineCtx.stroke();
+let currentRegionId = -1;
+const currentMaskCanvas = document.createElement('canvas');
+currentMaskCanvas.width = W; currentMaskCanvas.height = H;
+const cmCtx = currentMaskCanvas.getContext('2d');
 
-  lineCtx.beginPath();
-  lineCtx.arc(275,205,88,0,Math.PI*2);
-  lineCtx.stroke();
-
-  drawTriangle(lineCtx, 200,145, 165,80, 235,120);
-  drawTriangle(lineCtx, 350,145, 385,80, 315,120);
-
-  lineCtx.fillStyle = '#2c2620';
-  lineCtx.beginPath(); lineCtx.arc(245,200,6,0,Math.PI*2); lineCtx.fill();
-  lineCtx.beginPath(); lineCtx.arc(305,200,6,0,Math.PI*2); lineCtx.fill();
-  lineCtx.beginPath(); lineCtx.moveTo(275,225); lineCtx.lineTo(268,215); lineCtx.lineTo(282,215); lineCtx.closePath(); lineCtx.fill();
-
-  lineCtx.lineWidth = 3;
-  [[230,235,150,225],[228,245,150,248],[230,255,150,268],
-   [320,235,400,225],[322,245,400,248],[320,255,400,268]].forEach(p=>{
-    lineCtx.beginPath(); lineCtx.moveTo(p[0],p[1]); lineCtx.lineTo(p[2],p[3]); lineCtx.stroke();
-  });
+function updateCurrentMask(rid) {
+  cmCtx.clearRect(0,0,W,H);
+  if(rid < 0 || !regionMap) return;
+  const img = cmCtx.createImageData(W,H);
+  const data = img.data;
+  for(let i=0; i<W*H; i++){
+    if(regionMap[i] === rid) {
+      data[i*4+3] = 255;
+    }
+  }
+  cmCtx.putImageData(img, 0, 0);
 }
 
-function drawTriangle(ctx,x1,y1,x2,y2,x3,y3){
+function applyClipMask() {
+  if (currentRegionId < 0) {
+    tempCtx.clearRect(0,0,W,H);
+    return;
+  }
+  tempCtx.globalCompositeOperation = 'destination-in';
+  tempCtx.drawImage(currentMaskCanvas, 0, 0);
+  tempCtx.globalCompositeOperation = 'source-over';
+}
+
+function startDrawing(clientX, clientY){
+  const p = toWorldXY(clientX, clientY);
+  const px = Math.floor(p.x), py = Math.floor(p.y);
+  if(!inBounds(px,py)) return;
+  
+  if(state.tool === 'bucket'){
+    doBucketFill(px,py);
+    return;
+  }
+  
+  drawing = true;
+  lastPt = {x:p.x, y:p.y};
+  tempCtx.clearRect(0,0,W,H);
+  saveUndoSnapshot();
+  
+  currentRegionId = regionMap ? regionMap[idx(px,py)] : -1;
+  updateCurrentMask(currentRegionId);
+  
+  if(state.tool === 'stamp'){
+    stampAt(p.x, p.y);
+    drawing = false; 
+  } else if(state.tool === 'pen'){
+    strokeSegment(tempCtx, lastPt, lastPt);
+    applyClipMask();
+  } else if(state.tool === 'spray'){
+    sprayAt(tempCtx, p.x, p.y);
+    applyClipMask();
+  }
+}
+
+function moveDrawing(clientX, clientY){
+  const p = toWorldXY(clientX, clientY);
+  const px = Math.floor(p.x), py = Math.floor(p.y);
+  if(!inBounds(px,py)) return;
+  if(state.tool === 'pen'){
+    strokeSegment(tempCtx, lastPt, p);
+    lastPt = p;
+    applyClipMask();
+  } else if(state.tool === 'spray'){
+    sprayAt(tempCtx, p.x, p.y);
+    applyClipMask();
+  }
+}
+
+function endDrawing(){
+  drawing = false;
+  colorCtx.drawImage(tempCanvas,0,0);
+  tempCtx.clearRect(0,0,W,H);
+}
+
+function strokeSegment(ctx, a, b){
+  ctx.strokeStyle = state.color;
+  ctx.globalAlpha = 1; 
+  ctx.lineWidth = state.size;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   ctx.beginPath();
-  ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3); ctx.closePath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
   ctx.stroke();
 }
 
-function roundedRect(ctx,x,y,w,h,r){
-  ctx.moveTo(x+r,y);
-  ctx.arcTo(x+w,y,x+w,y+h,r);
-  ctx.arcTo(x+w,y+h,x,y+h,r);
-  ctx.arcTo(x,y+h,x,y,r);
-  ctx.arcTo(x,y,x+w,y,r);
-  ctx.closePath();
-}
-
-function resetColorLayer(){
-  colorCtx.clearRect(0,0,W,H);
-  colorCtx.fillStyle = '#ffffff';
-  colorCtx.fillRect(0,0,W,H);
-  previewCtx.clearRect(0,0,W,H);
-  undoStack = [];
-  updateUndoButton();
-}
-
-/* ---------- もどす(アンドゥ) ---------- */
-const MAX_UNDO = 20;
-let undoStack = [];
-function pushUndo(){
-  undoStack.push(colorCtx.getImageData(0,0,W,H));
-  if(undoStack.length > MAX_UNDO) undoStack.shift();
-  updateUndoButton();
-}
-function undo(){
-  if(!undoStack.length) return;
-  const prev = undoStack.pop();
-  colorCtx.putImageData(prev, 0, 0);
-  updateUndoButton();
-}
-function updateUndoButton(){
-  const btn = document.getElementById('btn-undo');
-  if(btn) btn.disabled = undoStack.length === 0;
-}
-
-/* ---------- どうぐの状態 ---------- */
-let currentTool = 'pen';
-let currentColor = '#ef4444';
-let brushSize = 10;
-let isDrawing = false;
-let lastX = 0, lastY = 0;
-let currentMaskCanvas = null;
-
-document.getElementById('brush-size').addEventListener('input', (e)=>{ brushSize = Number(e.target.value); });
-
-function setTool(tool){
-  currentTool = tool;
-  document.getElementById('tool-pen').classList.toggle('active', tool==='pen');
-  document.getElementById('tool-fill').classList.toggle('active', tool==='fill');
-}
-document.getElementById('tool-pen').addEventListener('click', ()=>setTool('pen'));
-document.getElementById('tool-fill').addEventListener('click', ()=>setTool('fill'));
-document.getElementById('btn-undo').addEventListener('click', undo);
-document.getElementById('btn-clear').addEventListener('click', ()=> resetColorLayer());
-
-/* ---------- いろパレット ---------- */
-const DEFAULT_COLORS = ['#ef4444','#ff9f1c','#ffd23f','#7fd858','#4fb3a9','#7ec8e3','#5b8def','#b06ae0','#ff6f9c','#f7c8a0','#5a4636','#9c9c9c','#000000','#ffffff'];
-let customColors = [];
-const paletteSwatchesEl = document.getElementById('palette-swatches');
-
-function selectColor(hex){
-  currentColor = hex;
-  renderPalette();
-}
-function addCustomColor(hex){
-  hex = hex.toLowerCase();
-  if(!DEFAULT_COLORS.includes(hex) && !customColors.includes(hex)) customColors.push(hex);
-  selectColor(hex);
-}
-function deleteCustomColor(hex){
-  customColors = customColors.filter(c => c !== hex);
-  if(currentColor === hex) selectColor(DEFAULT_COLORS[0]);
-  renderPalette();
-}
-function renderPalette(){
-  paletteSwatchesEl.innerHTML = '';
-  DEFAULT_COLORS.forEach(c=>{
-    const b = document.createElement('button');
-    b.className = 'swatch' + (c===currentColor ? ' active' : '');
-    b.style.background = c;
-    b.addEventListener('click', ()=> selectColor(c));
-    paletteSwatchesEl.appendChild(b);
-  });
-  customColors.forEach(c=>{
-    const wrap = document.createElement('div');
-    wrap.className = 'swatch-wrap';
-    const b = document.createElement('button');
-    b.className = 'swatch' + (c===currentColor ? ' active' : '');
-    b.style.background = c;
-    b.addEventListener('click', ()=> selectColor(c));
-    const del = document.createElement('button');
-    del.className = 'swatch-del';
-    del.textContent = '✕';
-    del.title = 'この色をけす';
-    del.addEventListener('click', (e)=>{ e.stopPropagation(); deleteCustomColor(c); });
-    wrap.appendChild(b); wrap.appendChild(del);
-    paletteSwatchesEl.appendChild(wrap);
-  });
-
-  const addWrap = document.createElement('div');
-  addWrap.className = 'swatch-add-wrap';
-  const addVisual = document.createElement('div');
-  addVisual.className = 'swatch-add-visual';
-  addVisual.textContent = '＋';
-  const addInput = document.createElement('input');
-  addInput.type = 'color';
-  addInput.className = 'swatch-add-input';
-  addInput.title = '色をつくって保存する';
-  addInput.value = currentColor;
-  addInput.addEventListener('input', (e)=> addCustomColor(e.target.value));
-  addWrap.appendChild(addVisual);
-  addWrap.appendChild(addInput);
-  paletteSwatchesEl.appendChild(addWrap);
-}
-selectColor(currentColor);
-
-/* ---------- 画面にあわせて「正方形」のキャンバスサイズを計算する ---------- */
-function setAppVH(){
-  document.documentElement.style.setProperty('--app-vh', (window.innerHeight * 0.01) + 'px');
-}
-setAppVH();
-
-const canvasAreaEl = document.getElementById('canvas-area');
-const canvasStackEl = document.getElementById('canvas-stack');
-let baseSquareSize = 300;
-
-function fitCanvasArea(){
-  const rect = canvasAreaEl.getBoundingClientRect();
-  baseSquareSize = Math.max(160, Math.floor(Math.min(rect.width, rect.height)) - 20);
-  applyZoom();
-}
-window.addEventListener('resize', ()=>{ setAppVH(); fitCanvasArea(); });
-window.addEventListener('orientationchange', ()=> setTimeout(()=>{ setAppVH(); fitCanvasArea(); }, 250));
-
-/* ---------- ズーム(絵の拡大) ---------- */
-const MIN_ZOOM = 1, MAX_ZOOM = 3, ZOOM_STEP = 0.25;
-let zoomLevel = 1;
-const zoomLabel = document.getElementById('zoom-label');
-const zoomInBtn = document.getElementById('zoom-in');
-const zoomOutBtn = document.getElementById('zoom-out');
-
-function applyZoom(){
-  const size = Math.round(baseSquareSize * zoomLevel);
-  canvasStackEl.style.width = size + 'px';
-  canvasStackEl.style.height = size + 'px';
-  zoomLabel.textContent = Math.round(zoomLevel * 100) + '%';
-  zoomOutBtn.disabled = zoomLevel <= MIN_ZOOM;
-  zoomInBtn.disabled = zoomLevel >= MAX_ZOOM;
-}
-zoomInBtn.addEventListener('click', ()=>{
-  zoomLevel = Math.min(MAX_ZOOM, +(zoomLevel + ZOOM_STEP).toFixed(2));
-  applyZoom();
-});
-zoomOutBtn.addEventListener('click', ()=>{
-  zoomLevel = Math.max(MIN_ZOOM, +(zoomLevel - ZOOM_STEP).toFixed(2));
-  applyZoom();
-});
-zoomLabel.addEventListener('click', ()=>{
-  zoomLevel = 1; applyZoom(); canvasAreaEl.scrollTo(0,0);
-});
-fitCanvasArea();
-
-/* ---------- モーダルの開閉 ---------- */
-function openModal(id){ document.getElementById(id).classList.add('open'); }
-function closeModal(id){ document.getElementById(id).classList.remove('open'); }
-document.getElementById('open-materials').addEventListener('click', ()=> openModal('materials-overlay'));
-document.getElementById('materials-close').addEventListener('click', ()=> closeModal('materials-overlay'));
-document.getElementById('materials-overlay').addEventListener('click', (e)=>{ if(e.target.id==='materials-overlay') closeModal('materials-overlay'); });
-document.getElementById('open-gallery').addEventListener('click', ()=> openModal('gallery-overlay'));
-document.getElementById('gallery-close').addEventListener('click', ()=> closeModal('gallery-overlay'));
-document.getElementById('gallery-overlay').addEventListener('click', (e)=>{ if(e.target.id==='gallery-overlay') closeModal('gallery-overlay'); });
-
-/* ---------- そざい(塗り絵の下絵)の管理 ---------- */
-let materials = [
-  { id:'dog', label:'いぬ', type:'builtin', render:drawDogOutline },
-  { id:'cat', label:'ねこ', type:'builtin', render:drawCatOutline },
-];
-let currentMaterialId = 'dog';
-const materialsGrid = document.getElementById('materials-grid');
-
-function generateBuiltinThumbnails(){
-  materials.forEach(m=>{
-    if(m.type === 'builtin' && !m.thumbDataUrl){
-      m.render();
-      m.thumbDataUrl = lineCanvas.toDataURL('image/png');
-    }
-  });
-}
-
-function renderMaterialsGrid(){
-  materialsGrid.innerHTML = '';
-  materials.forEach(m=>{
-    const chip = document.createElement('button');
-    chip.className = 'material-chip' + (m.id===currentMaterialId ? ' active' : '');
-    const thumb = document.createElement('div');
-    thumb.className = 'material-thumb';
-    const img = document.createElement('img');
-    img.src = m.thumbDataUrl;
-    thumb.appendChild(img);
-    const label = document.createElement('div');
-    label.className = 'material-label';
-    label.textContent = m.label;
-    chip.appendChild(thumb);
-    chip.appendChild(label);
-    chip.addEventListener('click', ()=>{ selectMaterial(m.id); closeModal('materials-overlay'); });
-    materialsGrid.appendChild(chip);
-  });
-
-  const addChip = document.createElement('div');
-  addChip.className = 'material-chip add-chip';
-  addChip.style.position = 'relative';
-  const addThumb = document.createElement('div');
-  addThumb.className = 'material-thumb';
-  addThumb.textContent = '＋';
-  addThumb.style.pointerEvents = 'none';
-  const addLabel = document.createElement('div');
-  addLabel.className = 'material-label';
-  addLabel.textContent = 'ついか';
-  addLabel.style.pointerEvents = 'none';
-  const addInput = document.createElement('input');
-  addInput.type = 'file';
-  addInput.accept = 'image/*';
-  addInput.multiple = true;
-  addInput.style.position = 'absolute';
-  addInput.style.inset = '0';
-  addInput.style.width = '100%';
-  addInput.style.height = '100%';
-  addInput.style.margin = '0';
-  addInput.style.padding = '0';
-  addInput.style.opacity = '0';
-  addInput.style.cursor = 'pointer';
-  addInput.addEventListener('change', handleMaterialFiles);
-  addChip.appendChild(addThumb);
-  addChip.appendChild(addLabel);
-  addChip.appendChild(addInput);
-  materialsGrid.appendChild(addChip);
-}
-
-function selectMaterial(id){
-  const m = materials.find(x=>x.id===id);
-  if(!m) return;
-  currentMaterialId = id;
-  resetColorLayer();
-  if(m.type === 'builtin'){ m.render(); }
-  else { lineCtx.clearRect(0,0,W,H); lineCtx.putImageData(m.lineImageData, 0, 0); }
-  renderMaterialsGrid();
-}
-
-function imageToLineData(img){
-  const temp = document.createElement('canvas');
-  temp.width = W; temp.height = H;
-  const tctx = temp.getContext('2d');
-  const scale = Math.min(W / img.width, H / img.height);
-  const dw = img.width * scale, dh = img.height * scale;
-  const dx = (W - dw) / 2, dy = (H - dh) / 2;
-  tctx.drawImage(img, dx, dy, dw, dh);
-
-  const imgData = tctx.getImageData(0,0,W,H);
-  const data = imgData.data;
-  const threshold = 200;
-  for(let i=0; i<data.length; i+=4){
-    if(data[i+3] === 0) continue;
-    const brightness = (data[i] + data[i+1] + data[i+2]) / 3;
-    if(brightness > threshold){ data[i+3] = 0; }
-    else { data[i]=44; data[i+1]=38; data[i+2]=32; data[i+3]=255; }
-  }
-  return imgData;
-}
-
-function imageDataToDataUrl(imgData){
-  const c = document.createElement('canvas');
-  c.width = W; c.height = H;
-  c.getContext('2d').putImageData(imgData, 0, 0);
-  return c.toDataURL('image/png');
-}
-
-function handleMaterialFiles(e){
-  const files = Array.from(e.target.files || []);
-  files.forEach((file, idx)=>{
-    const reader = new FileReader();
-    reader.onload = (ev)=>{
-      const img = new Image();
-      img.onload = ()=>{
-        const lineImageData = imageToLineData(img);
-        const id = 'material-' + Date.now() + '-' + idx;
-        const lineDataUrl = imageDataToDataUrl(lineImageData);
-        materials.push({
-          id, label: 'そざい' + (materials.filter(m=>m.type==='image').length + 1),
-          type: 'image', lineImageData, thumbDataUrl: lineDataUrl,
-        });
-        selectMaterial(id);
-        saveMaterialsToStorage();
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-  e.target.value = '';
-}
-
-/* ---------- そざいを次回もひきつぐ(ブラウザに保存) ---------- */
-const MATERIALS_STORAGE_KEY = 'nurie_materials_v1';
-
-function saveMaterialsToStorage(){
-  try{
-    const list = materials
-      .filter(m => m.type === 'image')
-      .map(m => ({ id:m.id, label:m.label, lineDataUrl:m.thumbDataUrl }));
-    localStorage.setItem(MATERIALS_STORAGE_KEY, JSON.stringify(list));
-  }catch(err){
-    showToast('⚠️ そざいの保存容量がいっぱいかもしれません');
+function sprayAt(ctx, x, y){
+  ctx.fillStyle = state.color;
+  const r = state.size;
+  const n = Math.max(6, Math.floor(r*1.2));
+  for(let i=0;i<n;i++){
+    const ang = Math.random()*Math.PI*2;
+    const rad = Math.random()*r;
+    const sx = Math.floor(x + Math.cos(ang)*rad);
+    const sy = Math.floor(y + Math.sin(ang)*rad);
+    ctx.fillRect(sx, sy, 3, 3);
   }
 }
 
-function loadMaterialsFromStorage(){
-  let raw;
-  try{ raw = localStorage.getItem(MATERIALS_STORAGE_KEY); }catch(err){ return; }
-  if(!raw) return;
-  let list;
-  try{ list = JSON.parse(raw); }catch(err){ return; }
-  if(!Array.isArray(list)) return;
-
-  list.forEach(item=>{
-    if(!item || !item.lineDataUrl) return;
-    const img = new Image();
-    img.onload = ()=>{
-      const temp = document.createElement('canvas');
-      temp.width = W; temp.height = H;
-      const tctx = temp.getContext('2d');
-      tctx.drawImage(img, 0, 0, W, H);
-      const lineImageData = tctx.getImageData(0,0,W,H);
-      materials.push({
-        id: item.id, label: item.label,
-        type: 'image', lineImageData, thumbDataUrl: item.lineDataUrl,
-      });
-      renderMaterialsGrid();
-    };
-    img.src = item.lineDataUrl;
-  });
+function stampAt(x, y){
+  const size = state.size*3 + 30;
+  tempCtx.fillStyle = state.color;
+  tempCtx.font = `900 ${size}px 'M PLUS Rounded 1c', sans-serif`;
+  tempCtx.textAlign = 'center';
+  tempCtx.textBaseline = 'middle';
+  tempCtx.fillText(state.stampChar, Math.floor(x), Math.floor(y));
+  applyClipMask();
+  endDrawing();
 }
 
-/* ---------- 他のスマホへ そざいを持っていく(書き出し・読み込み) ---------- */
+/* ★修正：バケツ塗りの「透明」の判定バグを完全解消 */
+function doBucketFill(px, py){
+  if(!inBounds(px, py)) return;
+  if(lineMask && lineMask[idx(px,py)] === 1) return;
+  
+  const colorImg = colorCtx.getImageData(0,0,W,H);
+  const data = colorImg.data;
+  const targetIdx = idx(px, py) * 4;
+  const tr = data[targetIdx], tg = data[targetIdx+1], tb = data[targetIdx+2], ta = data[targetIdx+3];
+  const [r, g, b] = hexToRgb(state.color);
+  
+  // 既に同じ色なら塗らない（透明な場所も同じ色なら無視）
+  if (ta === 255 && Math.abs(tr - r) < 5 && Math.abs(tg - g) < 5 && Math.abs(tb - b) < 5) return;
+  
+  saveUndoSnapshot();
+  
+  const q = new Int32Array(W*H);
+  let head = 0, tail = 0;
+  q[tail++] = idx(px, py);
+  const visited = new Uint8Array(W*H);
+  visited[idx(px,py)] = 1;
+  
+  // 「今クリックした場所が元々透明かどうか」を判定
+  const isTargetTransparent = (ta === 0);
 
-function exportMaterials(){
-  const list = materials
-    .filter(m => m.type === 'image')
-    .map(m => ({ id:m.id, label:m.label, lineDataUrl:m.thumbDataUrl }));
-  if(list.length === 0){
-    showToast('書き出せる そざいが まだありません');
-    return;
-  }
-  const blob = new Blob([JSON.stringify(list)], { type:'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.download = 'nurie-sozai.json';
-  link.href = url;
-  link.click();
-  URL.revokeObjectURL(url);
-  showToast('⬇️ そざいを書き出しました');
-}
-
-function importMaterialsFromFile(file){
-  const reader = new FileReader();
-  reader.onload = (ev)=>{
-    let list;
-    try{ list = JSON.parse(ev.target.result); }catch(err){
-      showToast('⚠️ このファイルは読み込めませんでした');
-      return;
-    }
-    if(!Array.isArray(list)){
-      showToast('⚠️ このファイルは読み込めませんでした');
-      return;
-    }
-    const existingIds = new Set(materials.map(m=>m.id));
-    let addedCount = 0;
-    let pending = 0;
-
-    list.forEach(item=>{
-      if(!item || !item.lineDataUrl || existingIds.has(item.id)) return;
-      pending++;
-      const img = new Image();
-      img.onload = ()=>{
-        const temp = document.createElement('canvas');
-        temp.width = W; temp.height = H;
-        const tctx = temp.getContext('2d');
-        tctx.drawImage(img, 0, 0, W, H);
-        const lineImageData = tctx.getImageData(0,0,W,H);
-        materials.push({
-          id: item.id, label: item.label,
-          type: 'image', lineImageData, thumbDataUrl: item.lineDataUrl,
-        });
-        addedCount++;
-        renderMaterialsGrid();
-        pending--;
-        if(pending === 0){
-          saveMaterialsToStorage();
-          showToast('⬆️ ' + addedCount + 'こ そざいを読み込みました');
+  while(head < tail){
+    const i = q[head++];
+    const x = i % W, y = Math.floor(i / W);
+    const i4 = i * 4;
+    
+    // 塗りつぶす
+    data[i4] = r; data[i4+1] = g; data[i4+2] = b; data[i4+3] = 255;
+    
+    // 上下左右に広げる処理
+    if(x > 0){
+      const n = i - 1;
+      if(!visited[n] && (!lineMask || lineMask[n] === 0)){
+        const n4 = n * 4;
+        if(isTargetTransparent) {
+          if(data[n4+3] === 0) { visited[n] = 1; q[tail++] = n; }
+        } else {
+          if(data[n4+3] === ta && Math.abs(data[n4]-tr) < 5 && Math.abs(data[n4+1]-tg) < 5 && Math.abs(data[n4+2]-tb) < 5){
+            visited[n] = 1; q[tail++] = n;
+          }
         }
-      };
-      img.src = item.lineDataUrl;
-    });
-
-    if(pending === 0) showToast('あたらしい そざいはありませんでした');
-  };
-  reader.readAsText(file);
-}
-
-document.getElementById('export-materials').addEventListener('click', exportMaterials);
-document.getElementById('import-materials-input').addEventListener('change', (e)=>{
-  const file = e.target.files && e.target.files[0];
-  if(file) importMaterialsFromFile(file);
-  e.target.value = '';
-});
-
-/* ---------- ほぞん一覧(ギャラリー) ---------- */
-let savedWorks = [];
-const galleryGrid = document.getElementById('gallery-grid');
-const galleryEmpty = document.getElementById('gallery-empty');
-
-function renderGallery(){
-  galleryGrid.innerHTML = '';
-  galleryEmpty.style.display = savedWorks.length ? 'none' : 'block';
-  savedWorks.forEach(work=>{
-    const item = document.createElement('div');
-    item.className = 'gallery-item';
-    const img = document.createElement('img');
-    img.src = work.dataUrl;
-    img.title = 'クリックでダウンロード';
-    img.addEventListener('click', ()=>{
-      const link = document.createElement('a');
-      link.download = 'nurie-' + work.animal + '-' + work.id + '.png';
-      link.href = work.dataUrl;
-      link.click();
-    });
-    const delBtn = document.createElement('button');
-    delBtn.className = 'gallery-del';
-    delBtn.textContent = '✕';
-    delBtn.title = '一覧から削除';
-    delBtn.addEventListener('click', (e)=>{
-      e.stopPropagation();
-      savedWorks = savedWorks.filter(w => w.id !== work.id);
-      renderGallery();
-    });
-    item.appendChild(img);
-    item.appendChild(delBtn);
-    galleryGrid.appendChild(item);
-  });
-}
-
-/* ---------- かんたんな通知(トースト) ---------- */
-let toastTimer = null;
-function showToast(message){
-  const t = document.getElementById('toast');
-  t.textContent = message;
-  t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=> t.classList.remove('show'), 1800);
-}
-
-document.getElementById('btn-save').addEventListener('click', ()=>{
-  const merged = document.createElement('canvas');
-  merged.width = W; merged.height = H;
-  const mctx = merged.getContext('2d');
-  mctx.drawImage(colorCanvas,0,0);
-  mctx.drawImage(lineCanvas,0,0);
-  const dataUrl = merged.toDataURL('image/png');
-
-  const link = document.createElement('a');
-  link.download = 'nurie-' + currentMaterialId + '.png';
-  link.href = dataUrl;
-  link.click();
-
-  savedWorks.push({ id: Date.now(), dataUrl, animal: currentMaterialId });
-  renderGallery();
-  showToast('✅ ほぞんしました!');
-});
-
-/* ---------- ペンツール(はみ出し防止つき) ---------- */
-
-function getPos(e){
-  const rect = colorCanvas.getBoundingClientRect();
-  const scaleX = colorCanvas.width / rect.width;
-  const scaleY = colorCanvas.height / rect.height;
-  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-  return { x:(clientX-rect.left)*scaleX, y:(clientY-rect.top)*scaleY };
-}
-
-function computeRegionMask(startX, startY){
-  if(startX<0||startY<0||startX>=W||startY>=H) return null;
-  const lineData = lineCtx.getImageData(0,0,W,H).data;
-  const startIdx = startY*W+startX;
-  if(lineData[startIdx*4+3] > 50) return null;
-
-  const mask = new Uint8Array(W*H);
-  const stack = [[startX,startY]];
-  while(stack.length){
-    const [x,y] = stack.pop();
-    if(x<0||y<0||x>=W||y>=H) continue;
-    const idx = y*W+x;
-    if(mask[idx]) continue;
-    const p = idx*4;
-    if(lineData[p+3] > 50) continue;
-    mask[idx] = 1;
-    stack.push([x+1,y],[x-1,y],[x,y+1],[x,y-1]);
-  }
-  return mask;
-}
-
-function maskToCanvas(mask){
-  const c = document.createElement('canvas');
-  c.width = W; c.height = H;
-  const cx = c.getContext('2d');
-  const id = cx.createImageData(W,H);
-  for(let i=0;i<mask.length;i++){ if(mask[i]) id.data[i*4+3] = 255; }
-  cx.putImageData(id,0,0);
-  return c;
-}
-
-function applyMaskToPreview(){
-  if(!currentMaskCanvas) return;
-  previewCtx.save();
-  previewCtx.globalCompositeOperation = 'destination-in';
-  previewCtx.drawImage(currentMaskCanvas,0,0);
-  previewCtx.restore();
-}
-
-function crispifyPreviewAlpha(){
-  const img = previewCtx.getImageData(0,0,W,H);
-  const d = img.data;
-  for(let i=3; i<d.length; i+=4){
-    d[i] = d[i] > 10 ? 255 : 0;
-  }
-  previewCtx.putImageData(img,0,0);
-}
-
-function touchDistance(t0, t1){
-  const dx = t0.clientX - t1.clientX;
-  const dy = t0.clientY - t1.clientY;
-  return Math.sqrt(dx*dx + dy*dy);
-}
-function touchMidpoint(t0, t1){
-  return { x:(t0.clientX + t1.clientX)/2, y:(t0.clientY + t1.clientY)/2 };
-}
-let pinchStartDist = null;
-let pinchStartZoom = 1;
-let pinchStartMidX = 0, pinchStartMidY = 0;
-let pinchStartScrollLeft = 0, pinchStartScrollTop = 0;
-
-function startDraw(e){
-  if(e.touches && e.touches.length === 2){
-    e.preventDefault();
-    isDrawing = false;
-    previewCtx.clearRect(0,0,W,H);
-    currentMaskCanvas = null;
-    pinchStartDist = touchDistance(e.touches[0], e.touches[1]);
-    pinchStartZoom = zoomLevel;
-    const mid = touchMidpoint(e.touches[0], e.touches[1]);
-    pinchStartMidX = mid.x; pinchStartMidY = mid.y;
-    pinchStartScrollLeft = canvasAreaEl.scrollLeft;
-    pinchStartScrollTop = canvasAreaEl.scrollTop;
-    return;
-  }
-  if(e.touches && e.touches.length > 1) return;
-
-  e.preventDefault();
-  const pos = getPos(e);
-
-  if(currentTool === 'fill'){
-    pushUndo();
-    floodFill(Math.floor(pos.x), Math.floor(pos.y), currentColor);
-    return;
-  }
-
-  pushUndo();
-  isDrawing = true;
-  lastX = pos.x; lastY = pos.y;
-
-  const mask = computeRegionMask(Math.floor(pos.x), Math.floor(pos.y));
-  currentMaskCanvas = mask ? maskToCanvas(mask) : null;
-
-  previewCtx.clearRect(0,0,W,H);
-  previewCtx.fillStyle = currentColor;
-  previewCtx.beginPath();
-  previewCtx.arc(pos.x,pos.y,brushSize/2,0,Math.PI*2);
-  previewCtx.fill();
-  applyMaskToPreview();
-  crispifyPreviewAlpha();
-}
-
-function moveDraw(e){
-  if(e.touches && e.touches.length === 2 && pinchStartDist){
-    e.preventDefault();
-    const newDist = touchDistance(e.touches[0], e.touches[1]);
-    const ratio = newDist / pinchStartDist;
-    zoomLevel = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, +(pinchStartZoom * ratio).toFixed(2)));
-    applyZoom();
-    const mid = touchMidpoint(e.touches[0], e.touches[1]);
-    const dx = mid.x - pinchStartMidX;
-    const dy = mid.y - pinchStartMidY;
-    canvasAreaEl.scrollLeft = pinchStartScrollLeft - dx;
-    canvasAreaEl.scrollTop = pinchStartScrollTop - dy;
-    return;
-  }
-  if(!isDrawing) return;
-  if(e.touches && e.touches.length > 1) return;
-  e.preventDefault();
-  const pos = getPos(e);
-  previewCtx.strokeStyle = currentColor;
-  previewCtx.lineWidth = brushSize;
-  previewCtx.lineCap = 'round';
-  previewCtx.beginPath();
-  previewCtx.moveTo(lastX,lastY);
-  previewCtx.lineTo(pos.x,pos.y);
-  previewCtx.stroke();
-  applyMaskToPreview();
-  crispifyPreviewAlpha();
-  lastX = pos.x; lastY = pos.y;
-}
-
-function endDraw(e){
-  if(e && e.touches && e.touches.length < 2){
-    pinchStartDist = null;
-  }
-  if(!e || !e.touches || e.touches.length === 0){
-    if(isDrawing){
-      crispifyPreviewAlpha();
-      colorCtx.drawImage(previewCanvas,0,0);
-      previewCtx.clearRect(0,0,W,H);
-      currentMaskCanvas = null;
+      }
     }
-    isDrawing = false;
+    if(x < W - 1){
+      const n = i + 1;
+      if(!visited[n] && (!lineMask || lineMask[n] === 0)){
+        const n4 = n * 4;
+        if(isTargetTransparent) {
+          if(data[n4+3] === 0) { visited[n] = 1; q[tail++] = n; }
+        } else {
+          if(data[n4+3] === ta && Math.abs(data[n4]-tr) < 5 && Math.abs(data[n4+1]-tg) < 5 && Math.abs(data[n4+2]-tb) < 5){
+            visited[n] = 1; q[tail++] = n;
+          }
+        }
+      }
+    }
+    if(y > 0){
+      const n = i - W;
+      if(!visited[n] && (!lineMask || lineMask[n] === 0)){
+        const n4 = n * 4;
+        if(isTargetTransparent) {
+          if(data[n4+3] === 0) { visited[n] = 1; q[tail++] = n; }
+        } else {
+          if(data[n4+3] === ta && Math.abs(data[n4]-tr) < 5 && Math.abs(data[n4+1]-tg) < 5 && Math.abs(data[n4+2]-tb) < 5){
+            visited[n] = 1; q[tail++] = n;
+          }
+        }
+      }
+    }
+    if(y < H - 1){
+      const n = i + W;
+      if(!visited[n] && (!lineMask || lineMask[n] === 0)){
+        const n4 = n * 4;
+        if(isTargetTransparent) {
+          if(data[n4+3] === 0) { visited[n] = 1; q[tail++] = n; }
+        } else {
+          if(data[n4+3] === ta && Math.abs(data[n4]-tr) < 5 && Math.abs(data[n4+1]-tg) < 5 && Math.abs(data[n4+2]-tb) < 5){
+            visited[n] = 1; q[tail++] = n;
+          }
+        }
+      }
+    }
+  }
+  colorCtx.putImageData(colorImg, 0, 0);
+}
+
+/* ============================================================
+   3. ラインアート読み込み・生成
+   ============================================================ */
+
+// カメラや写真から読み込んだ画像を、安全に「白い背景は透明」にして線画にする関数
+function convertToLineArt(imgData, w, h){
+  const src = imgData.data;
+  const gray = new Float32Array(w*h);
+  for(let i=0,p=0;i<w*h;i++,p+=4){
+    gray[i] = 0.299*src[p] + 0.587*src[p+1] + 0.114*src[p+2];
+  }
+  const blurred = new Float32Array(w*h);
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      let sum=0, cnt=0;
+      for(let dy=-1; dy<=1; dy++){
+        const ny=y+dy; if(ny<0||ny>=h) continue;
+        const rowBase = ny*w;
+        for(let dx=-1; dx<=1; dx++){
+          const nx=x+dx; if(nx<0||nx>=w) continue;
+          sum += gray[rowBase+nx]; cnt++;
+        }
+      }
+      blurred[y*w+x] = sum/cnt;
+    }
+  }
+  const mag = new Float32Array(w*h);
+  let maxMag = 1;
+  for(let y=1;y<h-1;y++){
+    for(let x=1;x<w-1;x++){
+      const i = y*w+x;
+      const gx = -blurred[i-w-1] - 2*blurred[i-1] - blurred[i+w-1]
+                 + blurred[i-w+1] + 2*blurred[i+1] + blurred[i+w+1];
+      const gy = -blurred[i-w-1] - 2*blurred[i-w] - blurred[i-w+1]
+                 + blurred[i+w-1] + 2*blurred[i+w] + blurred[i+w+1];
+      const m = Math.sqrt(gx*gx + gy*gy);
+      mag[i] = m;
+      if(m > maxMag) maxMag = m;
+    }
+  }
+  const threshold = maxMag * 0.22;
+  const isEdge = new Uint8Array(w*h);
+  for(let i=0;i<w*h;i++) isEdge[i] = (mag[i] > threshold) ? 1 : 0;
+  const dilated = new Uint8Array(w*h);
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      const i = y*w+x;
+      if(isEdge[i]){ dilated[i]=1; continue; }
+      let found=0;
+      for(let dy=-1; dy<=1 && !found; dy++){
+        const ny=y+dy; if(ny<0||ny>=h) continue;
+        const rowBase=ny*w;
+        for(let dx=-1; dx<=1; dx++){
+          const nx=x+dx; if(nx<0||nx>=w) continue;
+          if(isEdge[rowBase+nx]){ found=1; break; }
+        }
+      }
+      dilated[i]=found;
+    }
+  }
+  const out = new ImageData(w,h);
+  const od = out.data;
+  for(let i=0,p=0;i<w*h;i++,p+=4){
+    if(dilated[i]){ od[p]=0; od[p+1]=0; od[p+2]=0; od[p+3]=255; }
+    // ★写真クロップ時のバグ修正：余白を完全に透明（Alpha=0）にする
+    else{ od[p]=0; od[p+1]=0; od[p+2]=0; od[p+3]=0; }
+  }
+  return out;
+}
+
+// ユーザーの写真（クロップ）用の読み込み処理
+function loadLineArtFromImage(img){
+  lineCtx.clearRect(0,0,W,H);
+  const scale = Math.min(W/img.width, H/img.height) * 0.92;
+  const dw = img.width*scale, dh = img.height*scale;
+  const dx = (W-dw)/2, dy=(H-dh)/2;
+  lineCtx.drawImage(img, dx, dy, dw, dh);
+  
+  const raw = lineCtx.getImageData(0,0,W,H);
+  const converted = convertToLineArt(raw, W, H);
+  lineCtx.putImageData(converted, 0, 0);
+  
+  buildMaskAndRegions();
+  colorCtx.clearRect(0,0,W,H);
+  state.undoStack = [];
+}
+
+// ★修正：あらかじめ用意されたイラスト(cat.png等)を、確実に「黒枠＋透明」に変換する
+function loadPreparedLineArt(img){
+  lineCtx.clearRect(0,0,W,H);
+  const scale = Math.min(W/img.width, H/img.height) * 0.92;
+  const dw = img.width*scale, dh = img.height*scale;
+  const dx = (W-dw)/2, dy=(H-dh)/2;
+  
+  // 一旦そのまま描画
+  lineCtx.drawImage(img, dx, dy, dw, dh);
+  
+  const raw = lineCtx.getImageData(0,0,W,H);
+  const data = raw.data;
+  
+  for(let i=0; i<data.length; i+=4){
+    const a = data[i+3];
+    if(a > 0){
+      const bright = (data[i]+data[i+1]+data[i+2])/3;
+      // 暗い部分（128未満）は不透明な黒い線にする
+      if (bright < 128) {
+        data[i]=0; data[i+1]=0; data[i+2]=0; data[i+3]=255;
+      } 
+      // 明るい部分（白い背景やアンチエイリアスのカス）は完全に透明にする
+      else {
+        data[i]=0; data[i+1]=0; data[i+2]=0; data[i+3]=0;
+      }
+    }
+  }
+  lineCtx.putImageData(raw, 0, 0);
+  
+  buildMaskAndRegions();
+  colorCtx.clearRect(0,0,W,H);
+  state.undoStack = [];
+}
+
+// 共通の領域計算処理
+function buildMaskAndRegions(){
+  const img = lineCtx.getImageData(0,0,W,H);
+  const data = img.data;
+  lineMask = new Uint8Array(W*H);
+  
+  for(let i=0, p=0; i<W*H; i++, p+=4){
+    // アルファ値（透明度）が60より濃い部分を「線」として認識
+    lineMask[i] = data[p+3] > 60 ? 1 : 0;
+  }
+  
+  regionMap = new Int32Array(W*H).fill(-1);
+  regionCount = 0;
+  const queue = new Int32Array(W*H);
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      const i = idx(x,y);
+      if(lineMask[i] === 1 || regionMap[i] !== -1) continue;
+      let qh=0, qt=0;
+      queue[qt++] = i;
+      regionMap[i] = regionCount;
+      while(qh<qt){
+        const cur = queue[qh++];
+        const cx = cur % W, cy = (cur / W) | 0;
+        if(cx>0){ const n=cur-1; if(lineMask[n]===0 && regionMap[n]===-1){ regionMap[n]=regionCount; queue[qt++]=n; } }
+        if(cx<W-1){ const n=cur+1; if(lineMask[n]===0 && regionMap[n]===-1){ regionMap[n]=regionCount; queue[qt++]=n; } }
+        if(cy>0){ const n=cur-W; if(lineMask[n]===0 && regionMap[n]===-1){ regionMap[n]=regionCount; queue[qt++]=n; } }
+        if(cy<H-1){ const n=cur+W; if(lineMask[n]===0 && regionMap[n]===-1){ regionMap[n]=regionCount; queue[qt++]=n; } }
+      }
+      regionCount++;
+    }
   }
 }
 
-colorCanvas.addEventListener('mousedown', startDraw);
-colorCanvas.addEventListener('mousemove', moveDraw);
-colorCanvas.addEventListener('mouseup', endDraw);
-colorCanvas.addEventListener('mouseleave', endDraw);
-colorCanvas.addEventListener('touchstart', startDraw, {passive:false});
-colorCanvas.addEventListener('touchmove', moveDraw, {passive:false});
-colorCanvas.addEventListener('touchend', endDraw);
+const IMAGE_BUILTINS = {
+  cat: './cat.png',
+  dog: './dog.png',
+  anpanman: './anpanman.png'
+};
 
-/* ---------- ぬりつぶし(バケツ)ツール ---------- */
+function buildBuiltinArt(name){
+  if (IMAGE_BUILTINS[name]) {
+    const img = new Image();
+    img.onload = () => loadPreparedLineArt(img);
+    img.onerror = () => {
+      console.warn(IMAGE_BUILTINS[name] + ' が読み込めませんでした。手描き絵を描画します。');
+      buildVectorArt(name);
+    };
+    img.src = IMAGE_BUILTINS[name];
+    return; 
+  }
+  buildVectorArt(name);
+}
+
+// プログラムで描くイラスト
+function buildVectorArt(name){
+  lineCtx.clearRect(0,0,W,H);
+  lineCtx.lineWidth = 10;
+  lineCtx.lineCap='round'; lineCtx.lineJoin='round';
+  lineCtx.strokeStyle = '#000';
+  
+  if(name==='house'){
+    rectShape(lineCtx, 260,650, 480,390);
+    roofShape(lineCtx, 200,650, 500,300, 800,650);
+    doorArch(lineCtx, 440,1040, 120,260);
+    windowPane(lineCtx, 320,700, 100,100);
+    windowPane(lineCtx, 580,700, 100,100);
+    rectShape(lineCtx, 610,360, 55,140);
+    line(lineCtx, 598,360, 678,360);
+  } else if(name==='rocket'){
+    rocketBody(lineCtx, 500, 950);
+    circle(lineCtx, 500, 470, 65);
+    circle(lineCtx, 500, 470, 34);
+    fin(lineCtx, 400,830, 250,970, 400,970);
+    fin(lineCtx, 600,830, 750,970, 600,970);
+    curveQ(lineCtx, 460,1040, 470,1110, 445,1160);
+    curveQ(lineCtx, 500,1040, 500,1120, 500,1180);
+    curveQ(lineCtx, 540,1040, 530,1110, 555,1160);
+  }
+  
+  buildMaskAndRegions();
+  colorCtx.clearRect(0,0,W,H);
+  state.undoStack = [];
+}
+
+function circle(ctx,cx,cy,r){ ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke(); }
+function rectShape(ctx,x,y,w,h){ ctx.beginPath(); ctx.rect(x,y,w,h); ctx.stroke(); }
+function line(ctx,x1,y1,x2,y2){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
+function curveQ(ctx, x0,y0, cx,cy, x1,y1){ ctx.beginPath(); ctx.moveTo(x0,y0); ctx.quadraticCurveTo(cx,cy,x1,y1); ctx.stroke(); }
+
+function roofShape(ctx, x1,y1, apexX,apexY, x2,y2){
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(apexX,apexY); ctx.lineTo(x2,y2); ctx.closePath(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(apexX,apexY); ctx.lineTo(apexX,apexY+40); ctx.stroke();
+}
+function doorArch(ctx, x,y, w,h){
+  const r = w/2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y-h+r); ctx.arc(x+r, y-h+r, r, Math.PI, 0); ctx.lineTo(x+w, y); ctx.stroke();
+  circle(ctx, x+w-22, y-h/2, 8);
+}
+function windowPane(ctx, x,y,w,h){
+  rectShape(ctx, x,y,w,h); line(ctx, x+w/2, y, x+w/2, y+h); line(ctx, x, y+h/2, x+w, y+h/2);
+}
+function rocketBody(ctx, cx, bottomY){
+  const noseY = bottomY-750, bodyTopY = noseY+180, w = 220;
+  ctx.beginPath(); ctx.moveTo(cx-w/2, bodyTopY); ctx.quadraticCurveTo(cx-w/2, noseY, cx, noseY-40);
+  ctx.quadraticCurveTo(cx+w/2, noseY, cx+w/2, bodyTopY); ctx.lineTo(cx+w*0.35, bottomY);
+  ctx.quadraticCurveTo(cx, bottomY+30, cx-w*0.35, bottomY); ctx.closePath(); ctx.stroke();
+  line(ctx, cx-w/2+10, bodyTopY+120, cx+w/2-10, bodyTopY+120);
+}
+function fin(ctx, x1,y1, x2,y2, x3,y3){
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.quadraticCurveTo(x2-30,(y1+y2)/2, x2,y2); ctx.lineTo(x3,y3); ctx.closePath(); ctx.stroke();
+}
+
+/* ============================================================
+   4. アンドゥ
+   ============================================================ */
+function saveUndoSnapshot(){
+  try{
+    state.undoStack.push(colorCtx.getImageData(0,0,W,H));
+    if(state.undoStack.length > 15) state.undoStack.shift();
+  }catch(e){}
+}
+document.getElementById('undoBtn').addEventListener('click', ()=>{
+  const last = state.undoStack.pop();
+  if(last) colorCtx.putImageData(last,0,0);
+});
+document.getElementById('clearBtn').addEventListener('click', ()=>{
+  if(confirm('ぜんぶ けしちゃう？')){
+    saveUndoSnapshot();
+    colorCtx.clearRect(0,0,W,H);
+  }
+});
+document.getElementById('zoomResetBtn').addEventListener('click', fitToViewport);
+
+/* ============================================================
+   5. UI制御
+   ============================================================ */
+const drawOverlay = document.getElementById('drawOverlay');
+const toolOverlay = document.getElementById('toolOverlay');
+document.getElementById('openDrawBtn').addEventListener('click', ()=> drawOverlay.classList.add('show'));
+document.getElementById('drawCloseBtn').addEventListener('click', ()=> drawOverlay.classList.remove('show'));
+document.getElementById('openToolBtn').addEventListener('click', ()=> toolOverlay.classList.add('show'));
+document.getElementById('toolCloseBtn').addEventListener('click', ()=> toolOverlay.classList.remove('show'));
+
+document.querySelectorAll('#drawOverlay .tool-grid button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#drawOverlay .tool-grid button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    state.tool = btn.dataset.tool;
+    document.getElementById('kanaWrap').style.display = (state.tool==='stamp') ? 'block' : 'none';
+  });
+});
+document.getElementById('sizeSlider').addEventListener('input', (e)=>{ state.size = +e.target.value; });
+
+const KANA = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん".split('');
+const kanaPanel = document.getElementById('kanaPanel');
+KANA.forEach(ch=>{
+  const b = document.createElement('button');
+  b.textContent = ch;
+  b.addEventListener('click', ()=>{
+    kanaPanel.querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    state.stampChar = ch;
+  });
+  kanaPanel.appendChild(b);
+});
+kanaPanel.firstChild.classList.add('active');
+
+let PALETTE = ['#FF6FA5','#FF9F45','#FFD93D','#8CE99A','#63D2FF','#7C8CFF','#B78CFF','#FF8BA7','#A0522D','#4B4B4B','#FFFFFF','#222222'];
+let userPalette = [];
+
+function renderSwatches(){
+  const grid = document.getElementById('swatchGrid');
+  grid.innerHTML = '';
+  [...PALETTE, ...userPalette].forEach(hex=>{
+    const s = document.createElement('div');
+    s.className = 'swatch';
+    s.style.background = hex;
+    if(hex === state.color) s.classList.add('selected');
+    s.addEventListener('click', ()=>{ state.color = hex; renderSwatches(); });
+    grid.appendChild(s);
+  });
+  const colorBtn = document.getElementById('colorBtn');
+  if(colorBtn) colorBtn.style.borderColor = state.color;
+  const dot = document.getElementById('swatchDot');
+  if(dot) dot.style.background = state.color;
+}
+renderSwatches();
+
+const colorOverlay = document.getElementById('colorOverlay');
+document.getElementById('colorBadge').addEventListener('click', ()=>{
+  renderSwatches();
+  colorOverlay.classList.add('show');
+});
+document.getElementById('colorBtn').addEventListener('click', ()=>{
+  renderSwatches();
+  colorOverlay.classList.add('show');
+});
+document.getElementById('colorCloseBtn').addEventListener('click', ()=>{
+  colorOverlay.classList.remove('show');
+});
 
 function hexToRgb(hex){
-  hex = hex.replace('#','');
-  if(hex.length===3) hex = hex.split('').map(c=>c+c).join('');
-  const num = parseInt(hex,16);
-  return [ (num>>16)&255, (num>>8)&255, num&255 ];
+  const h = hex.replace('#','');
+  return [parseInt(h.substring(0,2),16), parseInt(h.substring(2,4),16), parseInt(h.substring(4,6),16)];
+}
+function rgbToHex(r,g,b){
+  return '#'+[r,g,b].map(v=>clamp(Math.round(v),0,255).toString(16).padStart(2,'0')).join('');
 }
 
-function floodFill(startX, startY, fillHex){
-  if(startX<0||startY<0||startX>=W||startY>=H) return;
-
-  const lineData = lineCtx.getImageData(0,0,W,H).data;
-  const colorImgData = colorCtx.getImageData(0,0,W,H);
-  const data = colorImgData.data;
-  const [fr,fg,fb] = hexToRgb(fillHex);
-
-  const startPos = (startY*W+startX)*4;
-  if(lineData[startPos+3] > 50) return;
-
-  const sr=data[startPos], sg=data[startPos+1], sb=data[startPos+2];
-  if (Math.abs(sr-fr)<8 && Math.abs(sg-fg)<8 && Math.abs(sb-fb)<8) return;
-
-  const tolerance = 40;
-  const stack = [[startX,startY]];
-  const visited = new Uint8Array(W*H);
-
-  while(stack.length){
-    const [x,y] = stack.pop();
-    if(x<0||y<0||x>=W||y>=H) continue;
-    const idx = y*W+x;
-    if(visited[idx]) continue;
-    const pos = idx*4;
-    if(lineData[pos+3] > 50) continue;
-
-    const r=data[pos], g=data[pos+1], b=data[pos+2];
-    if(Math.abs(r-sr)>tolerance || Math.abs(g-sg)>tolerance || Math.abs(b-sb)>tolerance) continue;
-
-    visited[idx] = 1;
-    data[pos]=fr; data[pos+1]=fg; data[pos+2]=fb; data[pos+3]=255;
-    stack.push([x+1,y],[x-1,y],[x,y+1],[x,y-1]);
-  }
-  colorCtx.putImageData(colorImgData,0,0);
-}
-
-/* ---------- さいしょの1まいを描く ---------- */
-generateBuiltinThumbnails();
-renderMaterialsGrid();
-selectMaterial('dog');
-loadMaterialsFromStorage();
-window.addEventListener('load', fitCanvasArea);
-
-/* ---------- ホーム画面アプリ化(サービスワーカー) ---------- */
-if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+const mixOverlay = document.getElementById('mixOverlay');
+let mixA = null, mixB = null, mixResultHex = null;
+function renderMixSwatches(){
+  const grid = document.getElementById('mixSwatchGrid');
+  grid.innerHTML = '';
+  [...PALETTE, ...userPalette].forEach(hex=>{
+    const s = document.createElement('div');
+    s.className = 'swatch';
+    s.style.background = hex;
+    s.addEventListener('click', ()=>{
+      if(!mixA){ mixA = hex; document.getElementById('mixSlotA').style.background = hex; }
+      else if(!mixB){ mixB = hex; document.getElementById('mixSlotB').style.background = hex; }
+      else { mixA = hex; mixB=null; document.getElementById('mixSlotA').style.background = hex; document.getElementById('mixSlotB').style.background=''; }
+    });
+    grid.appendChild(s);
   });
 }
+document.getElementById('mixOpenBtn').addEventListener('click', ()=>{
+  colorOverlay.classList.remove('show');
+  mixA=null; mixB=null; mixResultHex=null;
+  document.getElementById('mixSlotA').style.background='';
+  document.getElementById('mixSlotB').style.background='';
+  document.getElementById('mixResult').style.background='';
+  document.getElementById('mixUseBtn').style.display='none';
+  renderMixSwatches();
+  mixOverlay.classList.add('show');
+});
+document.getElementById('mixCloseBtn').addEventListener('click', ()=>mixOverlay.classList.remove('show'));
+document.getElementById('mixGoBtn').addEventListener('click', ()=>{
+  if(!mixA || !mixB){ alert('いろを２つ えらんでね'); return; }
+  const [r1,g1,b1] = hexToRgb(mixA), [r2,g2,b2] = hexToRgb(mixB);
+  mixResultHex = rgbToHex((r1+r2)/2, (g1+g2)/2, (b1+b2)/2);
+  document.getElementById('mixResult').style.background = mixResultHex;
+  document.getElementById('mixUseBtn').style.display = 'block';
+});
+document.getElementById('mixUseBtn').addEventListener('click', ()=>{
+  if(mixResultHex && !userPalette.includes(mixResultHex)){
+    userPalette.push(mixResultHex);
+    if(userPalette.length>12) userPalette.shift();
+  }
+  state.color = mixResultHex;
+  renderSwatches();
+  mixOverlay.classList.remove('show');
+});
+
+const picOverlay = document.getElementById('picOverlay');
+const picGrid = document.getElementById('picGrid');
+function renderPicGrid(){
+  picGrid.innerHTML = '';
+  [
+    {id:'cat', label:'🐱 ねこ'},
+    {id:'dog', label:'🐶 いぬ'},
+    {id:'anpanman', label:' アンパンマン'},
+    {id:'house', label:'🏠 おうち'},
+    {id:'rocket', label:'🚀 ロケット'}
+  ].forEach(item=>{
+    const b = document.createElement('button');
+    b.innerHTML = item.label;
+    b.style.fontSize='14px';
+    b.addEventListener('click', ()=>{
+      buildBuiltinArt(item.id);
+      picOverlay.classList.remove('show');
+      fitToViewport();
+    });
+    picGrid.appendChild(b);
+  });
+}
+renderPicGrid();
+document.getElementById('picBtn').addEventListener('click', ()=>{
+  renderSavedThumbs();
+  picOverlay.classList.add('show');
+});
+document.getElementById('picCloseBtn').addEventListener('click', ()=>picOverlay.classList.remove('show'));
+
+document.getElementById('addPhotoBtn').addEventListener('click', ()=>{
+  document.getElementById('fileInput').click();
+});
+document.getElementById('fileInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=> openCropUI(ev.target.result);
+  reader.readAsDataURL(file);
+  e.target.value = '';
+});
+
+const cropOverlay = document.getElementById('cropOverlay');
+const cropImg = document.getElementById('cropImg');
+const cropStageWrap = document.getElementById('cropStageWrap');
+let cropState = {natW:0, natH:0, baseScale:1, scale:1, x:0, y:0};
+
+function openCropUI(dataUrl){
+  const tmp = new Image();
+  tmp.onload = ()=>{
+    cropState.natW = tmp.width; cropState.natH = tmp.height;
+    const wrapSize = cropStageWrap.clientWidth || 320;
+    cropState.baseScale = Math.max(wrapSize/tmp.width, wrapSize/tmp.height);
+    cropState.scale = cropState.baseScale;
+    cropState.x = (wrapSize - tmp.width*cropState.scale)/2;
+    cropState.y = (wrapSize - tmp.height*cropState.scale)/2;
+    cropImg.src = dataUrl;
+    document.getElementById('cropZoom').value = 100;
+    updateCropTransform();
+    picOverlay.classList.remove('show');
+    cropOverlay.classList.add('show');
+  };
+  tmp.src = dataUrl;
+}
+function updateCropTransform(){
+  cropImg.style.transform = `translate(${cropState.x}px, ${cropState.y}px) scale(${cropState.scale})`;
+}
+document.getElementById('cropZoom').addEventListener('input', (e)=>{
+  const wrapSize = cropStageWrap.clientWidth || 320;
+  const cx = wrapSize/2, cy = wrapSize/2;
+  const oldScale = cropState.scale;
+  const factor = (+e.target.value)/100;
+  const newScale = cropState.baseScale * factor;
+  cropState.x = cx - (cx - cropState.x) * (newScale/oldScale);
+  cropState.y = cy - (cy - cropState.y) * (newScale/oldScale);
+  cropState.scale = newScale;
+  clampCropPosition();
+  updateCropTransform();
+});
+(function(){
+  let dragging=false, startX=0, startY=0, origX=0, origY=0;
+  function getP(e){ return e.touches? {x:e.touches[0].clientX,y:e.touches[0].clientY} : {x:e.clientX,y:e.clientY}; }
+  function down(e){ dragging=true; const p=getP(e); startX=p.x; startY=p.y; origX=cropState.x; origY=cropState.y; e.preventDefault(); }
+  function move(e){
+    if(!dragging) return;
+    const p=getP(e);
+    cropState.x = origX + (p.x-startX);
+    cropState.y = origY + (p.y-startY);
+    clampCropPosition();
+    updateCropTransform();
+    e.preventDefault();
+  }
+  function up(){ dragging=false; }
+  cropStageWrap.addEventListener('mousedown', down);
+  window.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', up);
+  cropStageWrap.addEventListener('touchstart', down, {passive:false});
+  window.addEventListener('touchmove', move, {passive:false});
+  window.addEventListener('touchend', up);
+})();
+function clampCropPosition(){
+  const wrapSize = cropStageWrap.clientWidth || 320;
+  const dw = cropState.natW*cropState.scale, dh = cropState.natH*cropState.scale;
+  cropState.x = clamp(cropState.x, wrapSize-dw, 0);
+  cropState.y = clamp(cropState.y, wrapSize-dh, 0);
+}
+document.getElementById('cropCancelBtn').addEventListener('click', ()=>{
+  cropOverlay.classList.remove('show');
+  picOverlay.classList.add('show');
+});
+document.getElementById('cropOkBtn').addEventListener('click', ()=>{
+  const wrapSize = cropStageWrap.clientWidth || 320;
+  const out = document.createElement('canvas');
+  const OUT=800;
+  out.width=OUT; out.height=OUT;
+  const octx = out.getContext('2d');
+  const sx = (0 - cropState.x)/cropState.scale;
+  const sy = (0 - cropState.y)/cropState.scale;
+  const sSize = wrapSize/cropState.scale;
+  const tmp = new Image();
+  tmp.onload = ()=>{
+    octx.fillStyle = '#fff'; octx.fillRect(0,0,OUT,OUT);
+    octx.drawImage(tmp, sx, sy, sSize, sSize, 0,0, OUT, OUT);
+    const lineDataUrl = convertToLineArt(octx.getImageData(0,0,OUT,OUT), OUT, OUT);
+    saveCustomPicture(lineDataUrl);
+    cropOverlay.classList.remove('show');
+    renderSavedThumbs();
+    picOverlay.classList.add('show');
+  };
+  tmp.src = cropImg.src;
+});
+
+function saveCustomPicture(imageData){
+  let list = JSON.parse(localStorage.getItem('nurie_custom_pics')||'[]');
+  
+  // Create an offscreen canvas to get the data url
+  const c = document.createElement('canvas');
+  c.width = imageData.width; c.height = imageData.height;
+  c.getContext('2d').putImageData(imageData, 0, 0);
+  
+  list.push({id:'custom_'+Date.now(), img: c.toDataURL('image/png')});
+  if(list.length>12) list.shift();
+  localStorage.setItem('nurie_custom_pics', JSON.stringify(list));
+}
+function renderSavedThumbs(){
+  const wrap = document.getElementById('savedThumbs');
+  wrap.innerHTML = '';
+  const list = JSON.parse(localStorage.getItem('nurie_custom_pics')||'[]');
+  list.forEach(item=>{
+    const tw = document.createElement('div'); tw.className='thumb-wrap';
+    const im = document.createElement('img'); im.src = item.img;
+    im.addEventListener('click', ()=>{
+      const im2 = new Image();
+      im2.onload = ()=>{ loadLineArtFromImage(im2); picOverlay.classList.remove('show'); fitToViewport(); };
+      im2.src = item.img;
+    });
+    const del = document.createElement('button'); del.className='thumb-del'; del.textContent='×';
+    del.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      const list2 = JSON.parse(localStorage.getItem('nurie_custom_pics')||'[]').filter(x=>x.id!==item.id);
+      localStorage.setItem('nurie_custom_pics', JSON.stringify(list2));
+      renderSavedThumbs();
+    });
+    tw.appendChild(im); tw.appendChild(del);
+    wrap.appendChild(tw);
+  });
+}
+
+const doneOverlay = document.getElementById('doneOverlay');
+const confettiCanvas = document.getElementById('confettiCanvas');
+const cctx = confettiCanvas.getContext('2d');
+let confettiParticles = [], confettiRunning=false;
+
+document.getElementById('doneBtn').addEventListener('click', ()=>{
+  const out = document.createElement('canvas');
+  out.width=W; out.height=H;
+  const octx = out.getContext('2d');
+  octx.fillStyle = '#fff'; octx.fillRect(0,0,W,H);
+  octx.drawImage(colorCanvas,0,0);
+  octx.drawImage(lineCanvas,0,0);
+  const link = document.createElement('a');
+  link.download = 'nurie_'+Date.now()+'.png';
+  link.href = out.toDataURL('image/png');
+  link.click();
+  runConfetti();
+  doneOverlay.classList.add('show');
+});
+document.getElementById('doneCloseBtn').addEventListener('click', ()=>{
+  doneOverlay.classList.remove('show');
+});
+
+function runConfetti(){
+  confettiCanvas.width = window.innerWidth;
+  confettiCanvas.height = window.innerHeight;
+  confettiCanvas.style.display='block';
+  confettiParticles = [];
+  const colors = ['#FF6FA5','#FFC93C','#69D48A','#63D2FF','#B18CFF','#FF9F45'];
+  for(let i=0;i<140;i++){
+    confettiParticles.push({
+      x: Math.random()*confettiCanvas.width,
+      y: -20 - Math.random()*200,
+      vx: (Math.random()-0.5)*3,
+      vy: 2+Math.random()*4,
+      size: 6+Math.random()*8,
+      color: colors[Math.floor(Math.random()*colors.length)],
+      rot: Math.random()*Math.PI*2,
+      vr: (Math.random()-0.5)*0.3
+    });
+  }
+  confettiRunning = true;
+  let start = Date.now();
+  function tick(){
+    if(!confettiRunning) return;
+    cctx.clearRect(0,0,confettiCanvas.width, confettiCanvas.height);
+    confettiParticles.forEach(p=>{
+      p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+      cctx.save();
+      cctx.translate(p.x,p.y); cctx.rotate(p.rot);
+      cctx.fillStyle = p.color;
+      cctx.fillRect(-p.size/2,-p.size/2, p.size, p.size*0.6);
+      cctx.restore();
+    });
+    if(Date.now()-start < 3200){
+      requestAnimationFrame(tick);
+    } else {
+      confettiRunning = false;
+      confettiCanvas.style.display='none';
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+let audioCtx = null;
+let bgmOn = false;
+let bgmTimer = null;
+
+const NOTE_FREQ = {C4:261.6,D4:293.7,E4:329.6,F4:349.2,G4:392.0,A4:440.0,B4:493.9,C5:523.3};
+const MELODY = [
+  'C4','C4','G4','G4','A4','A4','G4', null,
+  'F4','F4','E4','E4','D4','D4','C4', null,
+  'G4','G4','F4','F4','E4','E4','D4', null,
+  'G4','G4','F4','F4','E4','E4','D4', null,
+  'C4','C4','G4','G4','A4','A4','G4', null,
+  'F4','F4','E4','E4','D4','D4','C4', null,
+];
+let melodyIdx = 0;
+
+function playXyloNote(freq){
+  if(!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  const osc2 = audioCtx.createOscillator();
+  osc2.type='triangle'; osc2.frequency.value = freq*2;
+  const gain2 = audioCtx.createGain();
+  gain2.gain.setValueAtTime(0.05, t);
+  gain2.gain.exponentialRampToValueAtTime(0.001, t+0.3);
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.22, t+0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t+0.55);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc2.connect(gain2); gain2.connect(audioCtx.destination);
+  osc.start(t); osc.stop(t+0.6);
+  osc2.start(t); osc2.stop(t+0.35);
+}
+function bgmStep(){
+  if(!bgmOn) return;
+  const note = MELODY[melodyIdx % MELODY.length];
+  if(note) playXyloNote(NOTE_FREQ[note]);
+  melodyIdx++;
+  bgmTimer = setTimeout(bgmStep, 380);
+}
+document.getElementById('soundBtn').addEventListener('click', ()=>{
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+  bgmOn = !bgmOn;
+  document.getElementById('soundBtn').textContent = bgmOn ? '🔊' : '🔇';
+  if(bgmOn){ melodyIdx = 0; bgmStep(); }
+  else { clearTimeout(bgmTimer); }
+});
+
+const timerSetOverlay = document.getElementById('timerSetOverlay');
+const mathOverlay = document.getElementById('mathOverlay');
+const sleepScreen = document.getElementById('sleepScreen');
+const timerSelect = document.getElementById('timerSelect');
+for(let m=5;m<=60;m+=5){
+  const o = document.createElement('option'); o.value=m; o.textContent = m+'ぷん';
+  timerSelect.appendChild(o);
+}
+timerSelect.value = 15;
+
+let mathWrongCount = 0;
+let mathOnSuccess = null;
+let mathOnGiveUp = null;
+
+function askMath(onSuccess, onGiveUp){
+  mathWrongCount = 0;
+  mathOnSuccess = onSuccess;
+  mathOnGiveUp = onGiveUp;
+  showMathQuestion();
+  mathOverlay.classList.add('show');
+}
+function showMathQuestion(){
+  const a = 1+Math.floor(Math.random()*8);
+  const b = 1+Math.floor(Math.random()*8);
+  document.getElementById('mathQ').textContent = `${a} ＋ ${b} ＝ ？`;
+  document.getElementById('mathQ').dataset.answer = a+b;
+  document.getElementById('mathInput').value = '';
+  document.getElementById('mathMsg').textContent = '';
+}
+document.getElementById('mathOkBtn').addEventListener('click', ()=>{
+  const ans = +document.getElementById('mathInput').value;
+  const correct = +document.getElementById('mathQ').dataset.answer;
+  if(ans === correct){
+    mathOverlay.classList.remove('show');
+    if(mathOnSuccess) mathOnSuccess();
+  } else {
+    mathWrongCount++;
+    if(mathWrongCount >= 3){
+      document.getElementById('mathMsg').textContent = 'また あとで ためしてね';
+      mathOverlay.classList.remove('show');
+      if(mathOnGiveUp) mathOnGiveUp();
+    } else {
+      document.getElementById('mathMsg').textContent = 'ちがうよ、もういちど！';
+      showMathQuestion();
+    }
+  }
+});
+
+let timerDeadline = null;
+let timerCountdownId = null;
+
+document.getElementById('timerBtn').addEventListener('click', ()=>{
+  timerSetOverlay.classList.add('show');
+});
+document.getElementById('timerCloseBtn').addEventListener('click', ()=>{
+  timerSetOverlay.classList.remove('show');
+});
+document.getElementById('timerStartBtn').addEventListener('click', ()=>{
+  askMath(()=>{
+    const minutes = +timerSelect.value;
+    timerDeadline = Date.now() + minutes*60*1000;
+    startTimerCountdown();
+    timerSetOverlay.classList.remove('show');
+  }, ()=>{});
+});
+document.getElementById('timerCancelSetBtn').addEventListener('click', ()=>{
+  askMath(()=>{
+    timerDeadline = null;
+    if(timerCountdownId) clearInterval(timerCountdownId);
+    timerSetOverlay.classList.remove('show');
+  }, ()=>{});
+});
+function startTimerCountdown(){
+  if(timerCountdownId) clearInterval(timerCountdownId);
+  timerCountdownId = setInterval(()=>{
+    if(timerDeadline && Date.now() >= timerDeadline){
+      clearInterval(timerCountdownId);
+      lockScreen();
+    }
+  }, 1000);
+}
+function lockScreen(){
+  sleepScreen.classList.add('show');
+  if(bgmOn){ bgmOn=false; clearTimeout(bgmTimer); document.getElementById('soundBtn').textContent='🔇'; }
+}
+document.getElementById('sleepUnlockBtn').addEventListener('click', ()=>{
+  askMath(()=>{
+    sleepScreen.classList.remove('show');
+    timerDeadline = null;
+  }, ()=>{});
+});
+
+(function setupManifest(){
+  const manifest = {
+    name: "ぬりえあそび",
+    short_name: "ぬりえ",
+    start_url: ".",
+    display: "fullscreen",
+    orientation: "any",
+    background_color: "#FFF7E0",
+    theme_color: "#FFB6C1",
+    icons: [
+      {
+        "src": "./icon.png",
+        "sizes": "512x512",
+        "type": "image/png"
+      }
+    ]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('link');
+  link.rel = 'manifest';
+  link.href = url;
+  document.head.appendChild(link);
+})();
+
+function setViewportVars(){
+  document.getElementById('stage').style.height = window.innerHeight+'px';
+}
+window.addEventListener('resize', setViewportVars);
+window.addEventListener('orientationchange', ()=> setTimeout(()=>{ setViewportVars(); fitToViewport(); }, 200));
+setViewportVars();
+
+buildBuiltinArt('cat');
+fitToViewport();
+
+})();
 </script>
 </body>
 </html>
