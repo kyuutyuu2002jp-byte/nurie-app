@@ -176,7 +176,6 @@
 <div class="corner-btns top">
   <button class="round-fab" id="colorBtn" title="いろをえらぶ"><span class="fab-ico">🎨</span><span class="fab-txt">いろ</span></button>
   <button class="round-fab" id="picBtn" title="えをかえる"><span class="fab-ico">🖼️</span><span class="fab-txt">えを かえる</span></button>
-  <button class="round-fab" id="soundBtn" title="おんがく"><span class="fab-ico">🔊</span><span class="fab-txt">おんがく</span></button>
   <button class="round-fab" id="timerBtn" title="おしまいタイマー"><span class="fab-ico">⏰</span><span class="fab-txt">タイマー</span></button>
 </div>
 <button id="colorBadge" title="いまの いろ">
@@ -1232,57 +1231,6 @@ function runConfetti(){
   requestAnimationFrame(tick);
 }
 
-let audioCtx = null;
-let bgmOn = false;
-let bgmTimer = null;
-
-const NOTE_FREQ = {C4:261.6,D4:293.7,E4:329.6,F4:349.2,G4:392.0,A4:440.0,B4:493.9,C5:523.3};
-const MELODY = [
-  'C4','C4','G4','G4','A4','A4','G4', null,
-  'F4','F4','E4','E4','D4','D4','C4', null,
-  'G4','G4','F4','F4','E4','E4','D4', null,
-  'G4','G4','F4','F4','E4','E4','D4', null,
-  'C4','C4','G4','G4','A4','A4','G4', null,
-  'F4','F4','E4','E4','D4','D4','C4', null,
-];
-let melodyIdx = 0;
-
-function playXyloNote(freq){
-  if(!audioCtx) return;
-  const t = audioCtx.currentTime;
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.type = 'sine';
-  osc.frequency.value = freq;
-  const osc2 = audioCtx.createOscillator();
-  osc2.type='triangle'; osc2.frequency.value = freq*2;
-  const gain2 = audioCtx.createGain();
-  gain2.gain.setValueAtTime(0.05, t);
-  gain2.gain.exponentialRampToValueAtTime(0.001, t+0.3);
-  gain.gain.setValueAtTime(0.0001, t);
-  gain.gain.exponentialRampToValueAtTime(0.22, t+0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, t+0.55);
-  osc.connect(gain); gain.connect(audioCtx.destination);
-  osc2.connect(gain2); gain2.connect(audioCtx.destination);
-  osc.start(t); osc.stop(t+0.6);
-  osc2.start(t); osc2.stop(t+0.35);
-}
-function bgmStep(){
-  if(!bgmOn) return;
-  const note = MELODY[melodyIdx % MELODY.length];
-  if(note) playXyloNote(NOTE_FREQ[note]);
-  melodyIdx++;
-  bgmTimer = setTimeout(bgmStep, 380);
-}
-document.getElementById('soundBtn').addEventListener('click', ()=>{
-  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-  if(audioCtx.state === 'suspended') audioCtx.resume();
-  bgmOn = !bgmOn;
-  document.getElementById('soundBtn').textContent = bgmOn ? '🔊' : '🔇';
-  if(bgmOn){ melodyIdx = 0; bgmStep(); }
-  else { clearTimeout(bgmTimer); }
-});
-
 const timerSetOverlay = document.getElementById('timerSetOverlay');
 const mathOverlay = document.getElementById('mathOverlay');
 const sleepScreen = document.getElementById('sleepScreen');
@@ -1364,8 +1312,6 @@ function startTimerCountdown(){
     }
   }, 1000);
 }
-function lockScreen(){
-  sleepScreen.classList.add('show');
   if(bgmOn){ bgmOn=false; clearTimeout(bgmTimer); document.getElementById('soundBtn').textContent='🔇'; }
 }
 document.getElementById('sleepUnlockBtn').addEventListener('click', ()=>{
