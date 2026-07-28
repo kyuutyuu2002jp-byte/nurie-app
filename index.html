@@ -786,7 +786,7 @@ const IMAGE_BUILTINS = {
   dog: './dog.png',
   anpanman1: './anpanman1.png',
   anpanman2: './anpanman2.png',
-  car: './car.png' // 追加したい画像の情報を書いてください
+  jam: './jam.png' // 追加したい画像の情報を書いてください
 };
 
 function buildBuiltinArt(name){
@@ -1011,7 +1011,7 @@ function renderPicGrid(){
     {id:'dog', label:'🐶 いぬ'},
     {id:'anpanman1', label:' アンパンマン1'},
     {id:'anpanman2', label:' アンパンマン2'},
-    {id:'car', label:'🚗 くるま'}, // 追加したいボタンの情報を書いてください
+    {id:'jam', label:'ジャムおじさん'}, // 追加したいボタンの情報を書いてください
   ].forEach(item=>{
     const b = document.createElement('button');
     b.innerHTML = item.label;
