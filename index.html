@@ -782,10 +782,7 @@ const IMAGE_BUILTINS = {
   cat: './cat.png',
   dog: './dog.png',
   anpanman: './anpanman.png',
-　car: './car.png',
-  other1: './other1.png',  // ←★このように追加します（前の行の最後にカンマ「,」を忘れずに！）
-　other2: './other2.png',
-　other3: './other3.png'
+  car: './car.png'  // ←★このように追加します（前の行の最後にカンマ「,」を忘れずに！）
 };
 
 function buildBuiltinArt(name){
@@ -1009,13 +1006,10 @@ function renderPicGrid(){
   [
     {id:'cat', label:'🐱 ねこ'},
     {id:'dog', label:'🐶 いぬ'},
-    {id:'anpanman', label:' アンパンマン'},
+    {id:'car', label:'🚗 くるま'},  // ←★このように追加します
     {id:'house', label:'🏠 おうち'},
     {id:'rocket', label:'🚀 ロケット'}
-    {id:'car', label:'🚗 くるま'},  // ←★このように追加します
-    {id:'other1', label:'○ その他1'},  // ←★このように追加します
-    {id:'other2', label:'○ その他2'},  // ←★このように追加します
-    {id:'other3', label:'○ その他3'},  // ←★このように追加します
+  ].forEach(item=>{
     
   ].forEach(item=>{
     const b = document.createElement('button');
