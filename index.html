@@ -1303,6 +1303,7 @@ document.getElementById('timerCancelSetBtn').addEventListener('click', ()=>{
     timerSetOverlay.classList.remove('show');
   }, ()=>{});
 });
+
 function startTimerCountdown(){
   if(timerCountdownId) clearInterval(timerCountdownId);
   timerCountdownId = setInterval(()=>{
@@ -1312,9 +1313,13 @@ function startTimerCountdown(){
     }
   }, 1000);
 }
-  if(bgmOn){ bgmOn=false; clearTimeout(bgmTimer); document.getElementById('soundBtn').textContent='🔇'; }
+
+function lockScreen(){
+  sleepScreen.classList.add('show');
 }
+
 document.getElementById('sleepUnlockBtn').addEventListener('click', ()=>{
+  
   askMath(()=>{
     sleepScreen.classList.remove('show');
     timerDeadline = null;
