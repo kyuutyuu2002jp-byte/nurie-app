@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>ぬりえあそび</title>
+
+<!-- ▼ 修正3：静的なマニフェストファイルを読み込む -->
+<link rel="manifest" href="./manifest.json">
+
 <!-- ===== PWA / アプリモード用メタタグ ===== -->
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -527,6 +531,7 @@ function sprayAt(ctx, x, y){
   }
 }
 
+// ▼ 修正2：スタンプが線や外側でも押せるように変更
 function stampAt(x, y){
   const size = state.size*3 + 30;
   tempCtx.fillStyle = state.color;
@@ -534,7 +539,8 @@ function stampAt(x, y){
   tempCtx.textAlign = 'center';
   tempCtx.textBaseline = 'middle';
   tempCtx.fillText(state.stampChar, Math.floor(x), Math.floor(y));
-  applyClipMask();
+  
+  // マスク処理（applyClipMask）を外すことで、どこでも自由に押せるようになります
   endDrawing();
 }
 
@@ -1155,6 +1161,7 @@ document.getElementById('cropOkBtn').addEventListener('click', ()=>{
   tmp.src = cropImg.src;
 });
 
+// ▼ 修正1：LocalStorageの容量制限によるエラー防止
 function saveCustomPicture(imageData){
   let list = JSON.parse(localStorage.getItem('nurie_custom_pics')||'[]');
   const c = document.createElement('canvas');
@@ -1162,9 +1169,24 @@ function saveCustomPicture(imageData){
   c.getContext('2d').putImageData(imageData, 0, 0);
   
   list.push({id:'custom_'+Date.now(), img: c.toDataURL('image/png')});
-  if(list.length>12) list.shift();
-  localStorage.setItem('nurie_custom_pics', JSON.stringify(list));
+  
+  // 保存できるまで古いものを消す処理
+  let saved = false;
+  while(list.length > 0 && !saved) {
+    try {
+      localStorage.setItem('nurie_custom_pics', JSON.stringify(list));
+      saved = true;
+    } catch(e) {
+      // エラーが出たら一番古いものを1つ消してやり直す
+      list.shift();
+    }
+  }
+  
+  if(!saved) {
+    alert("本体の空き容量が足りず、えを保存できませんでした。");
+  }
 }
+
 function renderSavedThumbs(){
   const wrap = document.getElementById('savedThumbs');
   wrap.innerHTML = '';
@@ -1346,31 +1368,6 @@ document.getElementById('sleepUnlockBtn').addEventListener('click', ()=>{
     timerDeadline = null;
   }, ()=>{});
 });
-
-(function setupManifest(){
-  const manifest = {
-    name: "ぬりえあそび",
-    short_name: "ぬりえ",
-    start_url: ".",
-    display: "fullscreen",
-    orientation: "any",
-    background_color: "#FFF7E0",
-    theme_color: "#FFB6C1",
-    icons: [
-      {
-        "src": "./icon.png",
-        "sizes": "512x512",
-        "type": "image/png"
-      }
-    ]
-  };
-  const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('link');
-  link.rel = 'manifest';
-  link.href = url;
-  document.head.appendChild(link);
-})();
 
 function setViewportVars(){
   document.getElementById('stage').style.height = window.innerHeight+'px';
