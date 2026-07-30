@@ -171,7 +171,8 @@
 </div>
 <div class="corner-btns top-left">
   <button class="round-fab" id="openDrawBtn" title="どうぐをえらぶ"><span class="fab-ico">✏️</span><span class="fab-txt">どうぐ</span></button>
-  <button class="round-fab" id="openToolBtn" title="もどす・けす"><span class="fab-ico">⚙️</span><span class="fab-txt">そのた</span></button>
+  <button class="round-fab" id="undoDirectBtn" title="ひとつ もどす"><span class="fab-ico">↩️</span><span class="fab-txt">もどす</span></button>
+  <button class="round-fab" id="openToolBtn" title="ぜんぶけす"><span class="fab-ico">⚙️</span><span class="fab-txt">そのた</span></button>
 </div>
 <div class="corner-btns top">
   <button class="round-fab" id="colorBtn" title="いろをえらぶ"><span class="fab-ico">🎨</span><span class="fab-txt">いろ</span></button>
@@ -190,6 +191,7 @@
     <div class="tool-grid">
       <button data-tool="pen" class="active"><span class="ti">✏️</span><span class="tl">ペンで かく</span></button>
       <button data-tool="bucket"><span class="ti">🪣</span><span class="tl">いっきに ぬる</span></button>
+      <button data-tool="eraser"><span class="ti">🧽</span><span class="tl">けしゴム</span></button>
       <button data-tool="spray"><span class="ti">💨</span><span class="tl">シュッと ふきつけ</span></button>
       <button data-tool="stamp"><span class="ti">🔤</span><span class="tl">もじを ペタン</span></button>
     </div>
@@ -207,8 +209,6 @@
 <div class="overlay" id="toolOverlay">
   <div class="modal">
     <h2>⚙️ そのほかの ボタン</h2>
-    <p style="font-size:13px;color:#888;margin:0 0 8px;">まえに もどしたり、けしたり できるよ</p>
-    <button class="mini-btn secondary" id="undoBtn">↩️ ひとつ まえに もどす</button>
     <button class="mini-btn warn" id="clearBtn">🗑️ ぜんぶ けす</button>
     <button class="mini-btn secondary" id="zoomResetBtn">🔍 おおきさを もとに もどす</button>
     <button class="mini-btn secondary" id="toolCloseBtn">とじる</button>
@@ -467,8 +467,8 @@ function startDrawing(clientX, clientY){
   if(state.tool === 'stamp'){
     stampAt(p.x, p.y);
     drawing = false; 
-  } else if(state.tool === 'pen'){
-    strokeSegment(tempCtx, lastPt, lastPt);
+  } else if(state.tool === 'pen' || state.tool === 'eraser'){
+    strokeSegment(tempCtx, lastPt, lastPt, state.tool);
     applyClipMask();
   } else if(state.tool === 'spray'){
     sprayAt(tempCtx, p.x, p.y);
@@ -480,8 +480,8 @@ function moveDrawing(clientX, clientY){
   const p = toWorldXY(clientX, clientY);
   const px = Math.floor(p.x), py = Math.floor(p.y);
   if(!inBounds(px,py)) return;
-  if(state.tool === 'pen'){
-    strokeSegment(tempCtx, lastPt, p);
+  if(state.tool === 'pen' || state.tool === 'eraser'){
+    strokeSegment(tempCtx, lastPt, p, state.tool);
     lastPt = p;
     applyClipMask();
   } else if(state.tool === 'spray'){
@@ -492,12 +492,18 @@ function moveDrawing(clientX, clientY){
 
 function endDrawing(){
   drawing = false;
-  colorCtx.drawImage(tempCanvas,0,0);
-  tempCtx.clearRect(0,0,W,H);
+  if (state.tool === 'eraser') {
+    colorCtx.globalCompositeOperation = 'destination-out';
+    colorCtx.drawImage(tempCanvas, 0, 0);
+    colorCtx.globalCompositeOperation = 'source-over';
+  } else {
+    colorCtx.drawImage(tempCanvas, 0, 0);
+  }
+  tempCtx.clearRect(0, 0, W, H);
 }
 
-function strokeSegment(ctx, a, b){
-  ctx.strokeStyle = state.color;
+function strokeSegment(ctx, a, b, tool = 'pen'){
+  ctx.strokeStyle = (tool === 'eraser') ? 'rgba(255, 255, 255, 0.8)' : state.color;
   ctx.globalAlpha = 1; 
   ctx.lineWidth = state.size;
   ctx.lineCap = 'round';
@@ -617,10 +623,6 @@ function doBucketFill(px, py){
   colorCtx.putImageData(colorImg, 0, 0);
 }
 
-/* ============================================================
-   3. ラインアート読み込み・生成（修正版）
-   ============================================================ */
-
 function convertToLineArt(imgData, w, h){
   const src = imgData.data;
   const gray = new Float32Array(w*h);
@@ -694,23 +696,15 @@ function loadLineArtFromImage(img){
   lineCtx.drawImage(img, dx, dy, dw, dh);
   
   const raw = lineCtx.getImageData(0,0,W,H);
-  const data = raw.data;
-  for(let i=0; i<data.length; i+=4){
-    const a = data[i+3];
-    if(a > 0){
-      const bright = (data[i]+data[i+1]+data[i+2])/3;
-      data[i] = 0; data[i+1] = 0; data[i+2] = 0;
-      data[i+3] = Math.min(a, 255 - bright);
-    }
-  }
-  lineCtx.putImageData(raw, 0, 0);
+  const converted = convertToLineArt(raw, W, H);
+  lineCtx.putImageData(converted, 0, 0);
   
   buildMaskAndRegions();
   colorCtx.clearRect(0,0,W,H);
   state.undoStack = [];
 }
 
-function loadPreparedLineArt(img){
+function loadPreparedLineArt(img, fallbackName){
   lineCtx.clearRect(0,0,W,H);
   const scale = Math.min(W/img.width, H/img.height) * 0.92;
   const dw = img.width*scale, dh = img.height*scale;
@@ -721,7 +715,6 @@ function loadPreparedLineArt(img){
   try {
     const raw = lineCtx.getImageData(0,0,W,H);
     const data = raw.data;
-    
     for(let i=0; i<data.length; i+=4){
       const a = data[i+3];
       if(a > 0){
@@ -735,7 +728,7 @@ function loadPreparedLineArt(img){
     }
     lineCtx.putImageData(raw, 0, 0);
   } catch(e) {
-    alert("【エラー】セキュリティ制限により色が塗れません！\n\nNetlifyなどにアップロードしてから開くか、写真を追加ボタンから画像を選んでください。");
+    buildVectorArt(fallbackName);
     return;
   }
   
@@ -745,58 +738,51 @@ function loadPreparedLineArt(img){
 }
 
 function buildMaskAndRegions(){
-  try {
-    const img = lineCtx.getImageData(0,0,W,H);
-    const data = img.data;
-    lineMask = new Uint8Array(W*H);
-    
-    for(let i=0, p=0; i<W*H; i++, p+=4){
-      lineMask[i] = data[p+3] > 60 ? 1 : 0;
-    }
-    
-    regionMap = new Int32Array(W*H).fill(-1);
-    regionCount = 0;
-    const queue = new Int32Array(W*H);
-    for(let y=0;y<H;y++){
-      for(let x=0;x<W;x++){
-        const i = idx(x,y);
-        if(lineMask[i] === 1 || regionMap[i] !== -1) continue;
-        let qh=0, qt=0;
-        queue[qt++] = i;
-        regionMap[i] = regionCount;
-        while(qh<qt){
-          const cur = queue[qh++];
-          const cx = cur % W, cy = (cur / W) | 0;
-          if(cx>0){ const n=cur-1; if(lineMask[n]===0 && regionMap[n]===-1){ regionMap[n]=regionCount; queue[qt++]=n; } }
-          if(cx<W-1){ const n=cur+1; if(lineMask[n]===0 && regionMap[n]===-1){ regionMap[n]=regionCount; queue[qt++]=n; } }
-          if(cy>0){ const n=cur-W; if(lineMask[n]===0 && regionMap[n]===-1){ regionMap[n]=regionCount; queue[qt++]=n; } }
-          if(cy<H-1){ const n=cur+W; if(lineMask[n]===0 && regionMap[n]===-1){ regionMap[n]=regionCount; queue[qt++]=n; } }
-        }
-        regionCount++;
+  const img = lineCtx.getImageData(0,0,W,H);
+  const data = img.data;
+  lineMask = new Uint8Array(W*H);
+  
+  for(let i=0, p=0; i<W*H; i++, p+=4){
+    lineMask[i] = data[p+3] > 60 ? 1 : 0;
+  }
+  
+  regionMap = new Int32Array(W*H).fill(-1);
+  regionCount = 0;
+  const queue = new Int32Array(W*H);
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      const i = idx(x,y);
+      if(lineMask[i] === 1 || regionMap[i] !== -1) continue;
+      let qh=0, qt=0;
+      queue[qt++] = i;
+      regionMap[i] = regionCount;
+      while(qh<qt){
+        const cur = queue[qh++];
+        const cx = cur % W, cy = (cur / W) | 0;
+        if(cx>0){ const n=cur-1; if(lineMask[n]===0 && regionMap[n]===-1){ regionMap[n]=regionCount; queue[qt++]=n; } }
+        if(cx<W-1){ const n=cur+1; if(lineMask[n]===0 && regionMap[n]===-1){ regionMap[n]=regionCount; queue[qt++]=n; } }
+        if(cy>0){ const n=cur-W; if(lineMask[n]===0 && regionMap[n]===-1){ regionMap[n]=regionCount; queue[qt++]=n; } }
+        if(cy<H-1){ const n=cur+W; if(lineMask[n]===0 && regionMap[n]===-1){ regionMap[n]=regionCount; queue[qt++]=n; } }
       }
+      regionCount++;
     }
-  } catch(e) {
-    console.error(e);
   }
 }
 
-// 【重要】ここでイラストの登録とファイル名を紐付けます
 const IMAGE_BUILTINS = {
   cat: './cat.png',
   dog: './dog.png',
   anpanman1: './anpanman1.png',
   anpanman2: './anpanman2.png',
-  shockpan: './shockpan.png',
-  carrypan: './carrypan.png',
-  jam: './jam.png' // 追加したい画像の情報を書いてください
+  car: './car.png' 
 };
 
 function buildBuiltinArt(name){
   if (IMAGE_BUILTINS[name]) {
     const img = new Image();
-    img.onload = () => loadPreparedLineArt(img);
+    img.crossOrigin = "anonymous";
+    img.onload = () => loadPreparedLineArt(img, name);
     img.onerror = () => {
-      console.warn(IMAGE_BUILTINS[name] + ' が見つかりませんでした。手描き絵を描画します。');
       buildVectorArt(name);
     };
     img.src = IMAGE_BUILTINS[name];
@@ -828,6 +814,17 @@ function buildVectorArt(name){
     curveQ(lineCtx, 460,1040, 470,1110, 445,1160);
     curveQ(lineCtx, 500,1040, 500,1120, 500,1180);
     curveQ(lineCtx, 540,1040, 530,1110, 555,1160);
+  } else if(name==='cat'){
+    ellipse(lineCtx, 500, 660, 300, 270);
+    catEar(lineCtx, 330, 470, 250, 190, 420, 430);
+    catEar(lineCtx, 670, 470, 750, 190, 580, 430);
+    almondEye(lineCtx, 400, 630, 55, 34, -8);
+    almondEye(lineCtx, 600, 630, 55, 34, 8);
+    ctx_noseHeart(lineCtx, 500, 700);
+    curveQ(lineCtx, 500,712, 460,745, 470,760);
+    curveQ(lineCtx, 500,712, 540,745, 530,760);
+    line(lineCtx, 250,690, 90,655); line(lineCtx,250,720,80,720); line(lineCtx,250,750,90,795);
+    line(lineCtx, 750,690, 910,655); line(lineCtx,750,720,920,720); line(lineCtx,750,750,910,795);
   }
   
   buildMaskAndRegions();
@@ -836,6 +833,7 @@ function buildVectorArt(name){
 }
 
 function circle(ctx,cx,cy,r){ ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke(); }
+function ellipse(ctx,cx,cy,rx,ry){ ctx.beginPath(); ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2); ctx.stroke(); }
 function rectShape(ctx,x,y,w,h){ ctx.beginPath(); ctx.rect(x,y,w,h); ctx.stroke(); }
 function line(ctx,x1,y1,x2,y2){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
 function curveQ(ctx, x0,y0, cx,cy, x1,y1){ ctx.beginPath(); ctx.moveTo(x0,y0); ctx.quadraticCurveTo(cx,cy,x1,y1); ctx.stroke(); }
@@ -860,6 +858,19 @@ function rocketBody(ctx, cx, bottomY){
 function fin(ctx, x1,y1, x2,y2, x3,y3){
   ctx.beginPath(); ctx.moveTo(x1,y1); ctx.quadraticCurveTo(x2-30,(y1+y2)/2, x2,y2); ctx.lineTo(x3,y3); ctx.closePath(); ctx.stroke();
 }
+function catEar(ctx, baseInX,baseInY, tipX,tipY, baseOutX,baseOutY){
+  ctx.beginPath(); ctx.moveTo(baseInX, baseInY); ctx.quadraticCurveTo(tipX, tipY, baseOutX, baseOutY); ctx.closePath(); ctx.stroke();
+  const midX = (baseInX+baseOutX)/2, midY = (baseInY+baseOutY)/2 - 30;
+  ctx.beginPath(); ctx.moveTo((baseInX+midX)/2+15, (baseInY+midY)/2+10); ctx.quadraticCurveTo(tipX, tipY+40, (baseOutX+midX)/2-15, (baseOutY+midY)/2+10); ctx.stroke();
+}
+function almondEye(ctx, cx,cy, w,h, tilt){
+  ctx.save(); ctx.translate(cx,cy); ctx.rotate(tilt*Math.PI/180); ctx.beginPath(); ctx.moveTo(-w/2,0);
+  ctx.quadraticCurveTo(0,-h, w/2,0); ctx.quadraticCurveTo(0,h, -w/2,0); ctx.closePath(); ctx.stroke(); ctx.restore();
+}
+function ctx_noseHeart(ctx, cx,cy){
+  ctx.beginPath(); ctx.moveTo(cx, cy+22); ctx.quadraticCurveTo(cx-32, cy-14, cx, cy-4);
+  ctx.quadraticCurveTo(cx+32, cy-14, cx, cy+22); ctx.closePath(); ctx.stroke();
+}
 
 /* ============================================================
    4. アンドゥ
@@ -870,6 +881,11 @@ function saveUndoSnapshot(){
     if(state.undoStack.length > 15) state.undoStack.shift();
   }catch(e){}
 }
+// ★直接もどすボタンの処理を追加
+document.getElementById('undoDirectBtn').addEventListener('click', ()=>{
+  const last = state.undoStack.pop();
+  if(last) colorCtx.putImageData(last,0,0);
+});
 document.getElementById('undoBtn').addEventListener('click', ()=>{
   const last = state.undoStack.pop();
   if(last) colorCtx.putImageData(last,0,0);
@@ -898,6 +914,11 @@ document.querySelectorAll('#drawOverlay .tool-grid button').forEach(btn=>{
     btn.classList.add('active');
     state.tool = btn.dataset.tool;
     document.getElementById('kanaWrap').style.display = (state.tool==='stamp') ? 'block' : 'none';
+    
+    // ★スタンプ以外を選んだら自動で閉じる
+    if(state.tool !== 'stamp') {
+      drawOverlay.classList.remove('show');
+    }
   });
 });
 document.getElementById('sizeSlider').addEventListener('input', (e)=>{ state.size = +e.target.value; });
@@ -927,7 +948,12 @@ function renderSwatches(){
     s.className = 'swatch';
     s.style.background = hex;
     if(hex === state.color) s.classList.add('selected');
-    s.addEventListener('click', ()=>{ state.color = hex; renderSwatches(); });
+    s.addEventListener('click', ()=>{ 
+      state.color = hex; 
+      renderSwatches(); 
+      // ★色を選んだら自動で閉じる
+      colorOverlay.classList.remove('show');
+    });
     grid.appendChild(s);
   });
   const colorBtn = document.getElementById('colorBtn');
@@ -1007,15 +1033,14 @@ const picOverlay = document.getElementById('picOverlay');
 const picGrid = document.getElementById('picGrid');
 function renderPicGrid(){
   picGrid.innerHTML = '';
-  // 【重要】ここでメニュー画面のボタンを作ります
   [
     {id:'cat', label:'🐱 ねこ'},
     {id:'dog', label:'🐶 いぬ'},
     {id:'anpanman1', label:' アンパンマン1'},
     {id:'anpanman2', label:' アンパンマン2'},
-    {id:'shockpan', label:' しょくパンマン'},
-    {id:'carrypan', label:' カレーパンマン'},
-    {id:'jam', label:'ジャムおじさん'}, // 追加したいボタンの情報を書いてください
+    {id:'car', label:'🚗 くるま'},
+    {id:'house', label:'🏠 おうち'},
+    {id:'rocket', label:'🚀 ロケット'}
   ].forEach(item=>{
     const b = document.createElement('button');
     b.innerHTML = item.label;
@@ -1239,8 +1264,12 @@ const timerSetOverlay = document.getElementById('timerSetOverlay');
 const mathOverlay = document.getElementById('mathOverlay');
 const sleepScreen = document.getElementById('sleepScreen');
 const timerSelect = document.getElementById('timerSelect');
+
+// ★タイマーの「ふん」「っぷん」の判定を追加
 for(let m=5;m<=60;m+=5){
-  const o = document.createElement('option'); o.value=m; o.textContent = m+'ぷん';
+  const o = document.createElement('option'); o.value=m;
+  const suffix = (m % 10 === 0) ? 'っぷん' : 'ふん';
+  o.textContent = m + suffix;
   timerSelect.appendChild(o);
 }
 timerSelect.value = 15;
@@ -1307,7 +1336,6 @@ document.getElementById('timerCancelSetBtn').addEventListener('click', ()=>{
     timerSetOverlay.classList.remove('show');
   }, ()=>{});
 });
-
 function startTimerCountdown(){
   if(timerCountdownId) clearInterval(timerCountdownId);
   timerCountdownId = setInterval(()=>{
@@ -1317,13 +1345,10 @@ function startTimerCountdown(){
     }
   }, 1000);
 }
-
 function lockScreen(){
   sleepScreen.classList.add('show');
 }
-
 document.getElementById('sleepUnlockBtn').addEventListener('click', ()=>{
-  
   askMath(()=>{
     sleepScreen.classList.remove('show');
     timerDeadline = null;
