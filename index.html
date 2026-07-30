@@ -104,7 +104,7 @@
   }
   .round-fab .fab-ico{ font-size:22px; line-height:1; }
   .round-fab .fab-txt{ font-size:10px; font-weight:800; color:var(--ink); line-height:1; }
-  #colorBtn{ border:4px solid #FF6FA5; }
+  #colorBtn{ border:4px solid #FF0000; }
   #colorBadge{
     position:fixed; left:calc(12px + env(safe-area-inset-left));
     bottom:calc(16px + env(safe-area-inset-bottom));
@@ -333,7 +333,7 @@ let regionCount = 0;
 
 const state = {
   tool:'pen',
-  color:'#FF6FA5',
+  color:'#FF0000',
   size:18,
   scale:1, tx:0, ty:0,
   stampChar:'あ',
@@ -937,9 +937,12 @@ KANA.forEach(ch=>{
 });
 kanaPanel.firstChild.classList.add('active');
 
-let PALETTE = ['#FF6FA5','#FF9F45','#FFD93D','#8CE99A','#63D2FF','#7C8CFF','#B78CFF','#FF8BA7','#A0522D','#4B4B4B','#FFFFFF','#222222'];
+let PALETTE = ['#FF0000','#FF9F45','#FFD93D','#00CC00','#63D2FF','#0000FF','#B78CFF','#FF8BA7','#A0522D','#FFCC99','#FFFFFF','#222222'];
 let userPalette = [];
 
+
+
+  
 function renderSwatches(){
   const grid = document.getElementById('swatchGrid');
   grid.innerHTML = '';
