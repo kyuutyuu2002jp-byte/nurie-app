@@ -881,12 +881,7 @@ function saveUndoSnapshot(){
     if(state.undoStack.length > 15) state.undoStack.shift();
   }catch(e){}
 }
-// ★直接もどすボタンの処理を追加
 document.getElementById('undoDirectBtn').addEventListener('click', ()=>{
-  const last = state.undoStack.pop();
-  if(last) colorCtx.putImageData(last,0,0);
-});
-document.getElementById('undoBtn').addEventListener('click', ()=>{
   const last = state.undoStack.pop();
   if(last) colorCtx.putImageData(last,0,0);
 });
@@ -915,7 +910,6 @@ document.querySelectorAll('#drawOverlay .tool-grid button').forEach(btn=>{
     state.tool = btn.dataset.tool;
     document.getElementById('kanaWrap').style.display = (state.tool==='stamp') ? 'block' : 'none';
     
-    // ★スタンプ以外を選んだら自動で閉じる
     if(state.tool !== 'stamp') {
       drawOverlay.classList.remove('show');
     }
@@ -951,7 +945,6 @@ function renderSwatches(){
     s.addEventListener('click', ()=>{ 
       state.color = hex; 
       renderSwatches(); 
-      // ★色を選んだら自動で閉じる
       colorOverlay.classList.remove('show');
     });
     grid.appendChild(s);
@@ -1265,7 +1258,6 @@ const mathOverlay = document.getElementById('mathOverlay');
 const sleepScreen = document.getElementById('sleepScreen');
 const timerSelect = document.getElementById('timerSelect');
 
-// ★タイマーの「ふん」「っぷん」の判定を追加
 for(let m=5;m<=60;m+=5){
   const o = document.createElement('option'); o.value=m;
   const suffix = (m % 10 === 0) ? 'っぷん' : 'ふん';
