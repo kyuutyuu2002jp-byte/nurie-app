@@ -724,13 +724,18 @@ function loadPreparedLineArt(img, fallbackName){
     const data = raw.data;
     for(let i=0; i<data.length; i+=4){
       const a = data[i+3];
-      if(a > 0){
+      // ★修正: a > 0 だと拡大時のぼやけ(アンチエイリアス)まで全て線にしてしまうため、
+      // a > 128 (50%以上の濃さ) を基準にするよう変更
+      if(a > 128){
         const bright = (data[i]+data[i+1]+data[i+2])/3;
         if (bright < 160) {
           data[i]=0; data[i+1]=0; data[i+2]=0; data[i+3]=255;
         } else {
           data[i]=0; data[i+1]=0; data[i+2]=0; data[i+3]=0;
         }
+      } else {
+        // ★修正: 薄いピクセル(ぼやけ部分)や透明部分は完全に透明(アルファ0)にする
+        data[i]=0; data[i+1]=0; data[i+2]=0; data[i+3]=0;
       }
     }
     lineCtx.putImageData(raw, 0, 0);
@@ -743,7 +748,7 @@ function loadPreparedLineArt(img, fallbackName){
   colorCtx.clearRect(0,0,W,H);
   state.undoStack = [];
 }
-
+  
 function buildMaskAndRegions(){
   const img = lineCtx.getImageData(0,0,W,H);
   const data = img.data;
