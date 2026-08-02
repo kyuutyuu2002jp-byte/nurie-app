@@ -60,7 +60,7 @@
   }
   #canvasWorld canvas{
     position:absolute; left:0; top:0;
-    image-rendering:pixelated;
+    /* image-rendering:pixelated; ★修正: 拡大時にギザギザにならないよう無効化 */
   }
   #colorCanvas, #lineCanvas, #tempCanvas{ pointer-events:none; }
   .tool-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:10px;}
@@ -507,7 +507,8 @@ function endDrawing(){
 }
 
 function strokeSegment(ctx, a, b, tool = 'pen'){
-  ctx.strokeStyle = (tool === 'eraser') ? 'rgba(255, 255, 255, 0.8)' : state.color;
+  // ★修正: 消しゴムの時は alpha を 1 にして一発で綺麗に消えるように変更
+  ctx.strokeStyle = (tool === 'eraser') ? 'rgba(255, 255, 255, 1)' : state.color;
   ctx.globalAlpha = 1; 
   ctx.lineWidth = state.size;
   ctx.lineCap = 'round';
@@ -734,7 +735,7 @@ function loadPreparedLineArt(img, fallbackName){
     }
     lineCtx.putImageData(raw, 0, 0);
   } catch(e) {
-    buildVectorArt(fallbackName);
+    if(fallbackName) buildVectorArt(fallbackName);
     return;
   }
   
@@ -820,7 +821,7 @@ function buildVectorArt(name){
     curveQ(lineCtx, 460,1040, 470,1110, 445,1160);
     curveQ(lineCtx, 500,1040, 500,1120, 500,1180);
     curveQ(lineCtx, 540,1040, 530,1110, 555,1160);
-  } else if(name==='cat'){
+  } else if(name==='cat' || name==='dog'){ // ★修正: dogが読めない場合の簡易フォールバックを追加
     ellipse(lineCtx, 500, 660, 300, 270);
     catEar(lineCtx, 330, 470, 250, 190, 420, 430);
     catEar(lineCtx, 670, 470, 750, 190, 580, 430);
@@ -940,9 +941,6 @@ kanaPanel.firstChild.classList.add('active');
 let PALETTE = ['#FF0000','#FF9F45','#FFD93D','#00CC00','#63D2FF','#0000FF','#B78CFF','#FF8BA7','#A0522D','#FFCC99','#FFFFFF','#222222'];
 let userPalette = [];
 
-
-
-  
 function renderSwatches(){
   const grid = document.getElementById('swatchGrid');
   grid.innerHTML = '';
@@ -1155,8 +1153,11 @@ document.getElementById('cropOkBtn').addEventListener('click', ()=>{
   tmp.onload = ()=>{
     octx.fillStyle = '#fff'; octx.fillRect(0,0,OUT,OUT);
     octx.drawImage(tmp, sx, sy, sSize, sSize, 0,0, OUT, OUT);
-    const lineDataUrl = convertToLineArt(octx.getImageData(0,0,OUT,OUT), OUT, OUT);
-    saveCustomPicture(lineDataUrl);
+    
+    // ★修正: 変数名を正確にするために lineImageData に変更
+    const lineImageData = convertToLineArt(octx.getImageData(0,0,OUT,OUT), OUT, OUT);
+    saveCustomPicture(lineImageData);
+    
     cropOverlay.classList.remove('show');
     renderSavedThumbs();
     picOverlay.classList.add('show');
@@ -1175,6 +1176,8 @@ function saveCustomPicture(imageData){
   
   // 保存できるまで古いものを消す処理
   let saved = false;
+  let deletedCount = 0; // ★修正: 削除した数をカウント
+  
   while(list.length > 0 && !saved) {
     try {
       localStorage.setItem('nurie_custom_pics', JSON.stringify(list));
@@ -1182,11 +1185,15 @@ function saveCustomPicture(imageData){
     } catch(e) {
       // エラーが出たら一番古いものを1つ消してやり直す
       list.shift();
+      deletedCount++; // ★修正
     }
   }
   
   if(!saved) {
     alert("本体の空き容量が足りず、えを保存できませんでした。");
+  } else if (deletedCount > 0) {
+    // ★修正: 容量オーバーで古い画像を削除した際に通知を追加
+    alert(`本体の空き容量が足りないため、ふるいえを ${deletedCount} こ消したよ。`);
   }
 }
 
@@ -1199,7 +1206,8 @@ function renderSavedThumbs(){
     const im = document.createElement('img'); im.src = item.img;
     im.addEventListener('click', ()=>{
       const im2 = new Image();
-      im2.onload = ()=>{ loadLineArtFromImage(im2); picOverlay.classList.remove('show'); fitToViewport(); };
+      // ★修正: 保存済み画像は既に線画化済みなので loadPreparedLineArt を使う
+      im2.onload = ()=>{ loadPreparedLineArt(im2, null); picOverlay.classList.remove('show'); fitToViewport(); };
       im2.src = item.img;
     });
     const del = document.createElement('button'); del.className='thumb-del'; del.textContent='×';
