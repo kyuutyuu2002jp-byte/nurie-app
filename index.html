@@ -6,6 +6,7 @@
 <title>ぬりえあそび</title>
 
 <!-- ▼ 修正3：静的なマニフェストファイルを読み込む -->
+<!-- ※注意: 実際に同じ階層に manifest.json と icon.png を配置しないとPWAとしてインストールできません -->
 <link rel="manifest" href="./manifest.json">
 
 <!-- ===== PWA / アプリモード用メタタグ ===== -->
@@ -103,7 +104,7 @@
     padding:6px 2px;
   }
   .round-fab .fab-ico{ font-size:22px; line-height:1; }
-  .round-fab .fab-txt{ font-size:10px; font-weight:800; color:var(--ink); line-height:1; }
+  .round-fab .fab-txt{ font-size:10px; font-weight:800; color:var(--ink); line-height:1; white-space:nowrap; } /* ★修正: 文字が折り返さないように nowrap 追加 */
   #colorBtn{ border:4px solid #FF0000; }
   #colorBadge{
     position:fixed; left:calc(12px + env(safe-area-inset-left));
@@ -179,9 +180,9 @@
   <button class="round-fab" id="openToolBtn" title="ぜんぶけす"><span class="fab-ico">⚙️</span><span class="fab-txt">ぜんけし</span></button>
 </div>
 <div class="corner-btns top">
-  <button class="round-fab" id="colorBtn" title="いろをえらぶ"><span class="fab-ico">🎨</span><span class="fab-txt">いろ</span></button>
-  <button class="round-fab" id="picBtn" title="えをかえる"><span class="fab-ico">🖼️</span><span class="fab-txt">えを かえる</span></button>
   <button class="round-fab" id="timerBtn" title="おしまいタイマー"><span class="fab-ico">⏰</span><span class="fab-txt">タイマー</span></button>
+  <button class="round-fab" id="picBtn" title="えをかえる"><span class="fab-ico">🖼️</span><span class="fab-txt">えを かえる</span></button>
+  <button class="round-fab" id="colorBtn" title="いろをえらぶ"><span class="fab-ico">🎨</span><span class="fab-txt">いろ</span></button>
 </div>
 <button id="colorBadge" title="いまの いろ">
   <span class="swatchDot" id="swatchDot"></span>
@@ -286,7 +287,7 @@
 <div class="overlay" id="timerSetOverlay">
   <div class="modal">
     <h2>⏰ おしまいタイマー</h2>
-    <p>あと なんふんで おしまいにする？</p>
+    <p>あと なんぷんで おしまいにする？</p>
     <select id="timerSelect" style="font-size:20px; padding:8px; border-radius:12px;"></select>
     <button class="mini-btn" id="timerStartBtn" style="margin-top:14px;">スタート</button>
     <button class="mini-btn secondary" id="timerCancelSetBtn">タイマーをけす</button>
@@ -408,13 +409,20 @@ function onVPMove(e){
     moveDrawing(e.clientX, e.clientY);
   }
 }
+
+// ★修正: ピンチズーム後、残った1本指でそのまま描画を継続できるようにする
 function onVPUp(e){
   activePointers.delete(e.pointerId);
   if(activePointers.size < 2) pinch = null;
   if(activePointers.size === 0 && drawing){
     endDrawing();
+  } else if(activePointers.size === 1 && !drawing &&
+            (state.tool==='pen' || state.tool==='eraser' || state.tool==='spray')){
+    const remaining = Array.from(activePointers.values())[0];
+    startDrawing(remaining.x, remaining.y);
   }
 }
+
 function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
 function mid(a,b){ return {x:(a.x+b.x)/2, y:(a.y+b.y)/2}; }
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
@@ -799,6 +807,8 @@ function buildBuiltinArt(name){
     img.crossOrigin = "anonymous";
     img.onload = () => loadPreparedLineArt(img, name);
     img.onerror = () => {
+      // ★追加：画像読み込み失敗時のログ
+      console.warn('画像の読み込みに失敗しました:', IMAGE_BUILTINS[name]);
       buildVectorArt(name);
     };
     img.src = IMAGE_BUILTINS[name];
@@ -830,7 +840,7 @@ function buildVectorArt(name){
     curveQ(lineCtx, 460,1040, 470,1110, 445,1160);
     curveQ(lineCtx, 500,1040, 500,1120, 500,1180);
     curveQ(lineCtx, 540,1040, 530,1110, 555,1160);
-  } else if(name==='cat' || name==='dog'){ // ★修正: dogが読めない場合の簡易フォールバックを追加
+  } else if(name==='cat' || name==='dog'){
     ellipse(lineCtx, 500, 660, 300, 270);
     catEar(lineCtx, 330, 470, 250, 190, 420, 430);
     catEar(lineCtx, 670, 470, 750, 190, 580, 430);
@@ -841,11 +851,23 @@ function buildVectorArt(name){
     curveQ(lineCtx, 500,712, 540,745, 530,760);
     line(lineCtx, 250,690, 90,655); line(lineCtx,250,720,80,720); line(lineCtx,250,750,90,795);
     line(lineCtx, 750,690, 910,655); line(lineCtx,750,720,920,720); line(lineCtx,750,750,910,795);
+  } else {
+    // ★追加：pngが読み込めなかった場合(anpanman3, shock, carry, jam等)の
+    // 最終フォールバック。真っ白を避け、必ず何か塗れる絵を出す。
+    drawFallbackFace();
   }
   
   buildMaskAndRegions();
   colorCtx.clearRect(0,0,W,H);
   state.undoStack = [];
+}
+
+// ★追加：シンプルな顔（にこにこマーク）を描く最終フォールバック
+function drawFallbackFace(){
+  circle(lineCtx, 500, 650, 320);        // 輪郭
+  circle(lineCtx, 380, 580, 40);         // 左目
+  circle(lineCtx, 620, 580, 40);         // 右目
+  curveQ(lineCtx, 350, 730, 500, 850, 650, 730); // 口
 }
 
 function circle(ctx,cx,cy,r){ ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke(); }
@@ -1367,29 +1389,53 @@ document.getElementById('timerStartBtn').addEventListener('click', ()=>{
     timerSetOverlay.classList.remove('show');
   }, ()=>{});
 });
+
+// ★修正: タイマーを消した時は表示を元に戻す
 document.getElementById('timerCancelSetBtn').addEventListener('click', ()=>{
   askMath(()=>{
     timerDeadline = null;
     if(timerCountdownId) clearInterval(timerCountdownId);
+    document.querySelector('#timerBtn .fab-txt').textContent = 'タイマー';
     timerSetOverlay.classList.remove('show');
   }, ()=>{});
 });
+
+// ★修正: タイマーの残り時間をボタン上に表示する処理
 function startTimerCountdown(){
   if(timerCountdownId) clearInterval(timerCountdownId);
-  timerCountdownId = setInterval(()=>{
-    if(timerDeadline && Date.now() >= timerDeadline){
-      clearInterval(timerCountdownId);
-      lockScreen();
+  const txtLabel = document.querySelector('#timerBtn .fab-txt');
+
+  function update(){
+    if(!timerDeadline) {
+      txtLabel.textContent = 'タイマー';
+      return;
     }
-  }, 1000);
+    const remain = timerDeadline - Date.now();
+    if(remain <= 0){
+      txtLabel.textContent = 'タイマー';
+      clearInterval(timerCountdownId);
+      timerDeadline = null;
+      lockScreen();
+    } else {
+      const m = Math.floor(remain / 60000);
+      const s = Math.floor((remain % 60000) / 1000);
+      txtLabel.textContent = `${m}分${s.toString().padStart(2, '0')}秒`;
+    }
+  }
+  
+  update(); // 1秒待たずにすぐ初回更新
+  timerCountdownId = setInterval(update, 1000);
 }
+
 function lockScreen(){
   sleepScreen.classList.add('show');
 }
+// ★修正: スリープ解除時もタイマー表示を念のため元に戻す
 document.getElementById('sleepUnlockBtn').addEventListener('click', ()=>{
   askMath(()=>{
     sleepScreen.classList.remove('show');
     timerDeadline = null;
+    document.querySelector('#timerBtn .fab-txt').textContent = 'タイマー';
   }, ()=>{});
 });
 
